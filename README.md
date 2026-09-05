@@ -11,7 +11,7 @@
 [![Requires WooCommerce](https://img.shields.io/badge/WooCommerce-Required-96588A?style=flat-square&logo=woocommerce)](https://woocommerce.com)
 [![License](https://img.shields.io/badge/License-GPLv2%2B-blue?style=flat-square)](LICENSE.txt)
 
-[وب‌سایت نوین‌پرداز](https://npwp.ir) • [خدمات و پشتیبانی](https://npwp.ir/our-services/)
+[طراحی و ارتباط سایت با حسابداری نوین پرداز](https://npwp.ir) • [توضیحات محصول](https://npwp.ir/our-services/)
 
 </div>
 
