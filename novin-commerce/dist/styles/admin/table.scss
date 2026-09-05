@@ -1,0 +1,124 @@
+#product-list-table{
+  td.column-thumb img {
+    margin: 0;
+    width: auto;
+    height: auto;
+    max-width: 40px;
+    max-height: 40px;
+    vertical-align: middle;
+  }
+  span.wc-image {
+    display: block;
+    text-indent: -9999px;
+    position: relative;
+    height: 1em;
+    width: 1em;
+    margin: 0 auto;
+  }
+  th.column-thumb, td.column-thumb{
+    width: 52px;
+    text-align: center;
+    white-space: nowrap;
+  }
+  span.wc-image::before {
+    font-family: Dashicons;
+    speak: never;
+    font-weight: 400;
+    font-variant: normal;
+    text-transform: none;
+    line-height: 1;
+    -webkit-font-smoothing: antialiased;
+    margin: 0;
+    text-indent: 0;
+    position: absolute;
+    top: 0;
+    right: 0;
+    width: 100%;
+    height: 100%;
+    text-align: center;
+    content: "\f128";
+  }
+  span.no-guid{
+    color: red;
+  }
+  span.syncing{
+    color: green;
+  }
+  th#id{
+    width: 6em;
+  }
+  th#stock_quantity{
+    width: 4em;
+  }
+}
+
+.novin-dashboard { max-width: 1500px; direction: rtl; }
+.novin-dashboard-header { display:flex; justify-content:space-between; gap:24px; align-items:flex-end; margin:28px 0 22px; }
+.novin-dashboard-header h1 { margin:4px 0 8px; font-size:30px; letter-spacing:-.4px; }
+.novin-dashboard-header p { margin:0; color:#64748b; font-size:14px; }
+.novin-kicker { color:#64748b; font-size:11px; font-weight:800; letter-spacing:1.6px; }
+.novin-header-actions { display:flex; gap:8px; }
+.novin-health-grid { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:14px; margin-bottom:16px; }
+.novin-card,.novin-panel { background:#fff; border:1px solid #e5e7eb; border-radius:16px; box-shadow:0 8px 30px rgba(15,23,42,.045); }
+.novin-card { padding:18px; display:flex; gap:14px; align-items:flex-start; min-height:108px; }
+.novin-card-icon { width:42px; height:42px; border-radius:12px; display:grid; place-items:center; background:#f1f5f9; flex:0 0 42px; }
+.novin-card-icon svg,.novin-check-icon svg,.novin-tool svg { width:21px; height:21px; fill:none; stroke:currentColor; stroke-width:1.8; stroke-linecap:round; stroke-linejoin:round; }
+.novin-card-icon.success { color:#15803d; background:#ecfdf3; }.novin-card-icon.warning { color:#b45309; background:#fffbeb; }.novin-card-icon.error { color:#b91c1c; background:#fef2f2; }
+.novin-card span,.novin-card small { display:block; color:#64748b; }.novin-card strong { display:block; font-size:22px; margin:5px 0; }.novin-card small { font-size:11px; }
+.novin-dashboard-columns { display:grid; grid-template-columns:minmax(0,1.5fr) minmax(320px,1fr); gap:16px; margin-bottom:16px; }
+.novin-panel { padding:22px; }.novin-panel-title { display:flex; justify-content:space-between; align-items:center; gap:15px; margin-bottom:18px; }.novin-panel-title h2 { margin:0 0 5px; font-size:18px; }.novin-panel-title p { margin:0; color:#64748b; font-size:12px; }
+.novin-metrics { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:10px; }.novin-metric { padding:14px; border:1px solid #eef2f7; border-radius:12px; background:#fafbfc; }.novin-metric span { color:#64748b; font-size:11px; display:block; }.novin-metric strong { display:block; margin-top:5px; font-size:20px; }
+.novin-check-list { margin-top:16px; display:grid; gap:8px; }.novin-check { display:flex; gap:10px; padding:11px 12px; border:1px solid #eef2f7; border-radius:12px; }.novin-check-icon { width:28px; height:28px; display:grid; place-items:center; border-radius:9px; flex:0 0 28px; }.novin-check-icon.ok { color:#15803d; background:#ecfdf3; }.novin-check-icon.bad { color:#b91c1c; background:#fef2f2; }.novin-check strong { font-size:12px; }.novin-check p { margin:3px 0 0; color:#64748b; font-size:11px; }
+.novin-queue-list { display:grid; gap:8px; }.novin-queue-row { display:flex; justify-content:space-between; padding:13px 14px; border:1px solid #eef2f7; border-radius:11px; }.novin-queue-row span { color:#475569; }.novin-queue-row strong { font-variant-numeric:tabular-nums; }
+.novin-log-list { display:grid; gap:0; }.novin-log-row { display:flex; align-items:flex-start; gap:10px; padding:12px 0; border-bottom:1px solid #eef2f7; }.novin-log-row:last-child { border-bottom:0; }.novin-log-row p { margin:3px 0 0; color:#64748b; font-size:11px; }.novin-log-row time { margin-right:auto; color:#94a3b8; font-size:10px; white-space:nowrap; }.novin-status-dot { width:8px; height:8px; border-radius:50%; margin-top:5px; background:#94a3b8; }.novin-status-dot.success{background:#16a34a}.novin-status-dot.warning{background:#d97706}.novin-status-dot.error{background:#dc2626}
+.novin-tool { display:flex; align-items:center; gap:12px; padding:14px 0; border-bottom:1px solid #eef2f7; text-decoration:none; color:inherit; }.novin-tool:last-child{border-bottom:0}.novin-tool>span{width:34px;height:34px;display:grid;place-items:center;border-radius:10px;background:#f8fafc;color:#334155}.novin-tool strong,.novin-tool small{display:block}.novin-tool small{color:#64748b;margin-top:3px;font-size:11px}
+.novin-detail { margin-bottom:16px; }.novin-detail-grid { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:10px; }.novin-detail-item { padding:13px; border:1px solid #eef2f7; border-radius:11px; background:#fafbfc; min-width:0; }.novin-detail-item span{display:block;color:#64748b;font-size:10px}.novin-detail-item strong{display:block;margin-top:5px;word-break:break-word;font-size:12px}.novin-detail-item strong.success{color:#15803d}.novin-detail-item strong.warning{color:#b45309}.novin-detail-item strong.error{color:#b91c1c}.novin-detail-actions{display:flex;gap:8px;margin-top:16px}.novin-empty{padding:20px;text-align:center;color:#64748b;background:#f8fafc;border-radius:12px}
+@media (max-width:1000px){.novin-health-grid,.novin-dashboard-columns{grid-template-columns:1fr 1fr}.novin-detail-grid{grid-template-columns:repeat(2,1fr)}}
+@media (max-width:700px){.novin-health-grid,.novin-dashboard-columns,.novin-metrics,.novin-detail-grid{grid-template-columns:1fr}.novin-dashboard-header{display:block}.novin-header-actions{margin-top:14px}}
+
+
+.novin-dashboard-grid { display:grid; grid-template-columns:minmax(0,1.4fr) minmax(320px,.8fr); gap:16px; margin-bottom:16px; }
+.novin-dashboard-triple-row { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:16px; width:100%; min-width:0; margin-bottom:16px; align-items:stretch; }
+.novin-dashboard-triple-row > .novin-panel { width:100%; min-width:0; max-width:none; }
+@media (max-width:1100px){.novin-dashboard-triple-row{grid-template-columns:1fr 1fr}}
+@media (max-width:700px){.novin-dashboard-triple-row{grid-template-columns:1fr}}
+
+/* Dashboard 1.10.2 enhancements are compiled into table.min.css. */
+
+/* Dashboard stability overrides: keep equal-width cards and prevent SVG/icon inflation. */
+.novin-dashboard .novin-dashboard-triple-row { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:16px; width:100%; max-width:100%; min-width:0; margin:0 0 16px; align-items:stretch; }
+.novin-dashboard .novin-dashboard-triple-row > .novin-panel { display:flex; flex-direction:column; width:auto; min-width:0; max-width:none; margin:0; overflow:hidden; }
+.novin-dashboard .novin-dashboard-triple-row > .novin-panel > .novin-panel-title { min-height:62px; flex:0 0 auto; }
+.novin-dashboard .novin-insights-grid { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:12px; min-width:0; }
+.novin-dashboard .novin-insight-tile { display:flex; align-items:center; gap:12px; min-width:0; overflow:hidden; }
+.novin-dashboard .novin-insight-icon { width:40px; height:40px; min-width:40px; max-width:40px; flex:0 0 40px; display:grid; place-items:center; overflow:hidden; }
+.novin-dashboard .novin-insight-icon > svg { display:block; width:20px; height:20px; max-width:20px; max-height:20px; flex:0 0 20px; }
+.novin-dashboard .novin-insight-tile.tone-green { border-top:3px solid #16a34a; }
+.novin-dashboard .novin-insight-tile.tone-blue { border-top:3px solid #2563eb; }
+.novin-dashboard .novin-insight-tile.tone-purple { border-top:3px solid #7c3aed; }
+.novin-dashboard .novin-insight-tile.tone-amber { border-top:3px solid #d97706; }
+.novin-dashboard .novin-insight-tile.tone-teal { border-top:3px solid #0f766e; }
+.novin-dashboard .novin-insight-tile.tone-indigo { border-top:3px solid #4f46e5; }
+@media (max-width:1100px){.novin-dashboard .novin-dashboard-triple-row{grid-template-columns:repeat(2,minmax(0,1fr))}.novin-dashboard .novin-insights-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media (max-width:700px){.novin-dashboard .novin-dashboard-triple-row,.novin-dashboard .novin-insights-grid{grid-template-columns:1fr}}
+
+/* Novin Commerce 1.10.5 dashboard layout: authoritative final overrides */
+.novin-dashboard-sections{display:flex!important;flex-direction:column!important;gap:18px!important;width:100%!important;max-width:100%!important;min-width:0!important;margin:0!important;padding:0!important}
+.novin-dashboard-sections>.novin-panel,.novin-dashboard-sections>.novin-dashboard-grid{width:100%!important;max-width:100%!important;min-width:0!important;margin:0!important}
+.novin-dashboard-sections>.novin-dashboard-grid{display:grid!important;grid-template-columns:minmax(0,1.4fr) minmax(0,.8fr)!important;gap:18px!important}
+.novin-dashboard-sections .novin-dashboard-stat-grid{width:100%!important;grid-template-columns:repeat(4,minmax(0,1fr))!important;gap:14px!important}
+.novin-dashboard-sections .novin-insights-grid{width:100%!important;grid-template-columns:repeat(3,minmax(0,1fr))!important;gap:14px!important}
+.novin-dashboard-sections .novin-diagnostic-grid{width:100%!important;grid-template-columns:repeat(4,minmax(0,1fr))!important;gap:14px!important}
+.novin-dashboard-sections .novin-tools-grid{width:100%!important;grid-template-columns:repeat(4,minmax(0,1fr))!important;gap:14px!important}
+.novin-dashboard-sections .novin-insight-tile{width:100%!important;min-width:0!important;min-height:82px!important;display:flex!important;align-items:center!important;gap:14px!important;padding:15px 16px!important;overflow:hidden!important}
+.novin-dashboard-sections .novin-insight-icon{width:42px!important;height:42px!important;min-width:42px!important;max-width:42px!important;flex:0 0 42px!important;display:grid!important;place-items:center!important;border-radius:12px!important}
+.novin-dashboard-sections .novin-insight-icon svg{display:block!important;width:20px!important;height:20px!important;max-width:20px!important;max-height:20px!important;fill:none!important;stroke:currentColor!important;stroke-width:1.8!important;stroke-linecap:round!important;stroke-linejoin:round!important}
+.novin-dashboard-sections .novin-insight-copy{min-width:0!important;flex:1 1 auto!important;overflow:visible!important}
+.novin-dashboard-sections .novin-insight-line{display:flex!important;align-items:baseline!important;flex-wrap:wrap!important;gap:0 6px!important;line-height:1.7!important;white-space:normal!important}
+.novin-dashboard-sections .novin-insight-label{display:inline!important;margin:0!important;font-size:12px!important;font-weight:700!important;color:#334155!important;white-space:nowrap!important}
+.novin-dashboard-sections .novin-insight-line strong{display:inline!important;margin:0!important;font-size:22px!important;line-height:1.2!important;font-weight:800!important;color:#0f172a!important;white-space:nowrap!important}
+.novin-dashboard-sections .novin-insight-detail{display:inline!important;margin:0!important;font-size:11px!important;line-height:1.7!important;color:#64748b!important;white-space:normal!important}
+.novin-dashboard-sections .tone-green .novin-insight-icon{color:#15803d!important;background:#ecfdf3!important}.novin-dashboard-sections .tone-blue .novin-insight-icon{color:#2563eb!important;background:#eff6ff!important}.novin-dashboard-sections .tone-purple .novin-insight-icon{color:#7c3aed!important;background:#f5f3ff!important}.novin-dashboard-sections .tone-amber .novin-insight-icon{color:#b45309!important;background:#fffbeb!important}.novin-dashboard-sections .tone-teal .novin-insight-icon{color:#0f766e!important;background:#f0fdfa!important}.novin-dashboard-sections .tone-indigo .novin-insight-icon{color:#4f46e5!important;background:#eef2ff!important}
+.novin-dashboard-sections>.novin-panel{box-shadow:0 8px 28px rgba(15,23,42,.055)!important}
+@media(max-width:1100px){.novin-dashboard-sections .novin-dashboard-stat-grid{grid-template-columns:repeat(2,minmax(0,1fr))!important}.novin-dashboard-sections .novin-insights-grid{grid-template-columns:repeat(2,minmax(0,1fr))!important}.novin-dashboard-sections .novin-diagnostic-grid{grid-template-columns:repeat(2,minmax(0,1fr))!important}.novin-dashboard-sections .novin-tools-grid{grid-template-columns:repeat(2,minmax(0,1fr))!important}.novin-dashboard-sections>.novin-dashboard-grid{grid-template-columns:1fr!important}}
+@media(max-width:700px){.novin-dashboard-sections{gap:14px!important}.novin-dashboard-sections .novin-dashboard-stat-grid,.novin-dashboard-sections .novin-insights-grid,.novin-dashboard-sections .novin-diagnostic-grid,.novin-dashboard-sections .novin-tools-grid{grid-template-columns:1fr!important}.novin-dashboard-sections .novin-insight-tile{min-height:74px!important;padding:13px!important}}

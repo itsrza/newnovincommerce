@@ -1,0 +1,189 @@
+div.novincommerce_transactions {
+  // table
+  table {
+    border: 1px solid #ccc;
+    border-collapse: collapse;
+    margin: 0;
+    padding: 0;
+    width: 100%;
+    table-layout: fixed;
+  }
+
+  table caption {
+    font-size: 1.5em;
+    margin: .5em 0 .75em;
+  }
+
+  table tr {
+    background-color: #f8f8f8;
+    border: 1px solid #ddd;
+    padding: .35em;
+  }
+
+  table th,
+  table td {
+    padding: .625em;
+    text-align: center;
+    vertical-align: middle;
+  }
+
+  table th {
+    font-size: .85em;
+    letter-spacing: .1em;
+    text-transform: uppercase;
+    text-align: center;
+    vertical-align: middle;
+  }
+
+  @media screen and (max-width: 600px) {
+    table {
+      border: 0;
+    }
+
+    table caption {
+      font-size: 1.3em;
+    }
+
+    table thead {
+      border: none;
+      clip: rect(0 0 0 0);
+      height: 1px;
+      margin: -1px;
+      overflow: hidden;
+      padding: 0;
+      position: absolute;
+      width: 1px;
+    }
+
+    table tr {
+      border-bottom: 3px solid #ddd;
+      display: block;
+      margin-bottom: .625em;
+    }
+
+    table td {
+      border-bottom: 1px solid #ddd;
+      display: block;
+      font-size: .8em;
+      text-align: left;
+    }
+
+    table td::before {
+      /*
+      * aria-label has no advantage, it won't be read inside a table
+      content: attr(aria-label);
+      */
+      content: attr(data-label);
+      float: right;
+      font-weight: bold;
+      text-transform: uppercase;
+    }
+
+    table td:last-child {
+      border-bottom: 0;
+    }
+  }
+
+  // Modal
+  .modal-fader {
+    display: none;
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    width: 100%;
+    z-index: 999998;
+    background: rgba(0, 0, 0, 0.8);
+  }
+
+  .modal-fader.active {
+    display: block;
+  }
+
+  .modal-window {
+    display: none;
+    position: fixed;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 999999;
+    background: #fff;
+    padding: 20px;
+    border-radius: 5px;
+    font-family: sans-serif;
+    top: 10%;
+    margin-top: 0;
+    margin-left: 0;
+    width: 80%;
+    height: auto;
+    max-height: 80%;
+    overflow-y: auto;
+
+    h1,
+    h2,
+    h3,
+    h4,
+    h5,
+    h6 {
+      margin: 0;
+    }
+  }
+
+  .modal-window.active {
+    display: block;
+  }
+
+  .modal-btn {
+    background: #36a5a5;
+    border: none;
+    color: #fff;
+    padding: 4px 6px;
+    box-shadow: none;
+    border-radius: 3px;
+    text-decoration: none;
+  }
+
+  // Pagination
+  .pagination-wrapper {
+    text-align: center;
+    margin: 20px auto;
+
+    .pagination {
+      display: inline-block;
+
+      a {
+        color: black;
+        float: left;
+        padding: 5px 16px;
+        text-decoration: none;
+        border: 1px solid #ddd;
+      }
+
+      a.disabled {
+        pointer-events: none;
+        cursor: default;
+      }
+
+      a.active {
+        background-color: #36a5a5;
+        color: white;
+        border: 1px solid #36a5a5;
+      }
+
+      a:hover:not(.active) {
+        background-color: #ddd;
+      }
+
+      a:first-child {
+        border-top-left-radius: 5px;
+        border-bottom-left-radius: 5px;
+      }
+
+      a:last-child {
+        border-top-right-radius: 5px;
+        border-bottom-right-radius: 5px;
+      }
+    }
+  }
+
+}
