@@ -3,122 +3,27 @@ namespace MobinDev\Novin_Commerce\Admin;
 
 use MobinDev\Novin_Commerce\Common\SettingAPI;
 use MobinDev\Novin_Commerce\Common\SyncLog;
+use MobinDev\Novin_Commerce\Common\WebPrd_Applier;
 use MobinDev\Novin_Commerce\Models\Sync;
 
 class Connection_Dashboard {
     public static function render() {
         if ( ! current_user_can( 'manage_options' ) ) wp_die( esc_html__( 'دسترسی غیرمجاز.', 'novin-commerce' ) );
         $plugin_file = dirname( __DIR__, 2 ) . '/novin-commerce.php';
-        wp_enqueue_style( 'novin-commerce-admin-table', plugins_url( 'dist/styles/admin/table.min.css', $plugin_file ), [], '1.10.14-dash14' );
+        wp_enqueue_style( 'novin-commerce-admin-table', plugins_url( 'dist/styles/admin/table.min.css', $plugin_file ), [], '1.10.15-dash15' );
         wp_add_inline_style( 'novin-commerce-admin-table', self::critical_css() );
-        wp_enqueue_script( 'novin-commerce-dashboard-js', plugins_url( 'dist/scripts/admin/dashboard.js', $plugin_file ), [], '1.10.14-dash14', true );
+        wp_enqueue_script( 'novin-commerce-dashboard-js', plugins_url( 'dist/scripts/admin/dashboard.js', $plugin_file ), [], '1.10.15-dash15', true );
         $started = microtime( true );
         self::handle_actions();
+        // Accounting data always wins: sweep the newest products once every 6h
+        // and write stock/price/variable-structure changes automatically.
+        $auto_changed = WebPrd_Applier::catchup();
+        if ( $auto_changed ) Sync::flushHealthCache();
         $health = self::health();
-        $logs = SyncLog::recent( 12 );
-        // 'issues' exists since 1.10.12; tolerate a transient cached by an older build.
-        $wp_issues = isset( $health['webprd']['issues'] ) ? (int) $health['webprd']['issues'] : (int) ( $health['webprd']['stale'] ?? 0 ) + (int) ( $health['webprd']['guid_mismatch'] ?? 0 );
-        $query_ms = round( ( microtime( true ) - $started ) * 1000, 1 );
         echo '<div class="wrap novin-dashboard">';
-        echo '<header class="novin-hero"><div><span class="novin-kicker">NOVIN COMMERCE</span><h1>مرکز کنترل تبادل</h1><p>وضعیت تبادل اطلاعات و مواردی را که نیاز به بررسی دارند، یکجا ببینید.</p></div><div class="novin-hero-actions"><a class="button" href="'.esc_url(admin_url('admin.php?page=novin-commerce-products')).'">کالاها</a><a class="button" href="'.esc_url(admin_url('admin.php?page=novin-commerce-syncs')).'">صف تبادل</a><a class="button" href="'.esc_url(admin_url('admin.php?page=novin-commerce-settings')).'">تنظیمات</a><a class="button button-primary" href="'.esc_url(admin_url('admin.php?page=novin-commerce-dashboard')).'">بررسی دوباره</a></div></header>';
+        echo '<header class="novin-hero"><div><span class="novin-kicker">NOVIN COMMERCE</span><h1>داشبورد همگام‌سازی کالا</h1><p>نمای زندهٔ کاتالوگ از دادهٔ حسابداری (WebPrd) و ووکامرس — همگام‌سازی موجودی/قیمت/ساختار به‌صورت خودکار انجام می‌شود.</p></div><div class="novin-hero-actions"><a class="button" href="'.esc_url(admin_url('admin.php?page=novin-commerce-products')).'">کالاها</a><a class="button" href="'.esc_url(admin_url('admin.php?page=novin-commerce-syncs')).'">صف تبادل</a><a class="button" href="'.esc_url(admin_url('admin.php?page=novin-commerce-settings')).'">تنظیمات</a><a class="button button-primary" href="'.esc_url(admin_url('admin.php?page=novin-commerce-dashboard')).'">بررسی دوباره</a></div></header>';
         self::render_catalog_summary( $health );
-        echo '<div class="novin-health-grid novin-health-grid-extended">';
-        self::card('وضعیت اتصال', $health['api']['label'], $health['api']['status'], self::icon('link'), $health['api']['detail']);
-        self::card('صف تبادل', number_format_i18n($health['queue']['all']), $health['queue']['all'] ? 'warning':'success', self::icon('queue'), $health['queue']['all'] ? 'مورد در انتظار تبادل' : 'صف خالی است');
-        self::card('کالاهای سایت', number_format_i18n($health['catalog']['products']), 'info', self::icon('box'), 'محصولات اصلی منتشرشده');
-        self::card('Variationها', number_format_i18n($health['catalog']['variations']), 'purple', self::icon('layers'), 'Variationهای منتشرشده');
-        self::card('بدون GUID', number_format_i18n($health['catalog']['missing_guid']), $health['catalog']['missing_guid'] ? 'warning':'success', self::icon('key'), 'کالاهایی که شناسه اتصال ندارند');
-        self::card('نیازمند بررسی', number_format_i18n($wp_issues), $wp_issues?'warning':'success', self::icon('alert'), 'GUID نامطابق یا تاریخ Sync قدیمی در WebPrd');
-        self::card('رویدادهای اخیر', number_format_i18n($health['logs']['total']), $health['logs']['error'] ? 'error':'teal', self::icon('activity'), $health['logs']['error'] ? number_format_i18n($health['logs']['error']).' خطای ثبت‌شده' : 'بدون خطای ثبت‌شده');
-        self::card('زمان بررسی', $query_ms.' ms', $query_ms < 500 ? 'success':'warning', self::icon('speed'), 'زمان تولید همین داشبورد');
-        echo '</div>';
-
-        echo '<div class="novin-dashboard-grid">';
-        echo '<section class="novin-panel novin-panel-wide"><div class="novin-panel-title"><div><h2>تصویر کلی فروشگاه</h2><p>یک نمای سریع از کالاها، اتصال و وضعیت اطلاعات دریافت‌شده.</p></div></div><div class="novin-chart-row novin-chart-row-3">';
-        self::donut('ترکیب کاتالوگ', $health['catalog']['products'], $health['catalog']['variations'], 'محصول', 'Variation', 'محصول');
-        self::donut('وضعیت اتصال', $health['catalog']['with_guid'], $health['catalog']['missing_guid'], 'دارای GUID', 'بدون GUID', 'دارای GUID');
-        self::horizontal_bars('سلامت WebPrd', [
-            ['label'=>'داده معتبر','value'=>$health['webprd']['valid'],'max'=>max(1,$health['webprd']['sample'])],
-            ['label'=>'عقب‌مانده از Sync','value'=>$health['webprd']['stale'],'max'=>max(1,$health['webprd']['sample'])],
-            ['label'=>'مغایرت GUID','value'=>$health['webprd']['guid_mismatch'],'max'=>max(1,$health['webprd']['sample'])],
-            ['label'=>'بدون WebPrd','value'=>max(0,$health['webprd']['sample']-$health['webprd']['valid']),'max'=>max(1,$health['webprd']['sample'])],
-        ]);
-        echo '</div></section></div>';
-
-        echo '<div class="novin-dashboard-triple-row">';
-        echo '<section class="novin-panel"><div class="novin-panel-title"><div><h2>صف تبادل</h2><p>مواردی که در نوبت تبادل قرار دارند.</p></div><a class="button" href="'.esc_url(admin_url('admin.php?page=novin-commerce-syncs')).'">مشاهده صف</a></div>';
-        $queue=[ 'product'=>'کالا','variation'=>'Variation','order'=>'فاکتور','category'=>'دسته‌بندی','user'=>'شخص' ];
-        $queue_counts=$health['queue']['counts'];
-        $queue_all=isset($queue_counts['_total'])?(int)$queue_counts['_total']:(int)$health['queue']['all'];
-        foreach($queue as $type=>$label){
-            $c=isset($queue_counts[$type])?(int)$queue_counts[$type]:0;
-            $pct=$queue_all?min(100,round($c/$queue_all*100)):0;
-            echo '<div class="novin-bar-row"><div><span>'.esc_html($label).'</span><strong>'.number_format_i18n($c).'</strong></div><div class="novin-bar"><i style="width:'.$pct.'%"></i></div></div>';
-        }
-        if(!$queue_all)echo '<div class="novin-empty">صف تبادل خالی است — با تغییر کالا، فاکتور یا شخص، مورد جدیدی در صف قرار می‌گیرد.</div>';
-        echo '</section>';
-        echo '<section class="novin-panel"><div class="novin-panel-title"><div><h2>وضعیت فعالیت</h2><p>رویدادهای ۲۴ ساعت اخیر + کالاهای نیازمند بررسی (بر اساس GUID و تاریخ Sync داخل WebPrd).</p></div></div><div class="novin-mini-chart">';
-        self::stacked_bars('رویدادهای ۲۴ ساعت اخیر', [
-            ['label'=>'موفق','value'=>$health['logs']['success'],'class'=>'success'],
-            ['label'=>'در انتظار','value'=>$health['logs']['warning'],'class'=>'warning'],
-            ['label'=>'خطا','value'=>$health['logs']['error'],'class'=>'error'],
-            ['label'=>'اطلاع','value'=>$health['logs']['info'],'class'=>'info'],
-        ]);
-        $cat_new  = isset( $health['catalog']['new_24h'] ) ? (int) $health['catalog']['new_24h'] : 0;
-        $cat_sync = isset( $health['catalog']['synced_24h'] ) ? (int) $health['catalog']['synced_24h'] : 0;
-        echo '<div class="novin-activity-summary">';
-        self::metric('موفق (رویدادهای ۲۴ ساعت)', number_format_i18n($health['logs']['success']));
-        self::metric('کالاهای همگام‌شده در ۲۴ ساعت', number_format_i18n($cat_sync));
-        self::metric('نیازمند بررسی (WebPrd)', number_format_i18n($wp_issues));
-        echo '</div>';
-        echo '<div class="novin-activity-catalog" style="margin-top:6px;font-size:12px;color:#64748b;line-height:1.8">کالای تازه منتشرشده در ۲۴ ساعت: '.number_format_i18n($cat_new).' — این شمارش مستقیم از دیتای کالاهاست و به ثبت لاگ وابسته نیست.</div>';
-        $wp_ok = (int) $health['webprd']['valid'] - $wp_issues;
-        echo '<div class="novin-activity-catalog" style="margin-top:10px;padding:8px 10px;background:#f8fafc;border:1px solid #eef2f7;border-radius:10px;font-size:12px;color:#334155;line-height:1.9">از '.number_format_i18n((int)$health['webprd']['sample']).' کالای نمونه: <strong>'.number_format_i18n(max(0,$wp_ok)).'</strong> همگام‌شده و سالم · <strong>'.number_format_i18n($wp_issues).'</strong> نیازمند بررسی (GUID نامطابق با سایت، یا Modified در JSON قدیمی‌تر از آخرین Sync است).</div>';
-        echo '<div class="novin-activity-foot">'.($health['logs']['latest']!==''?esc_html('آخرین فعالیت: '.self::time_label($health['logs']['latest'])):esc_html('هنوز رویدادی ثبت نشده است.')).'</div></div></section>';
-        echo '<section class="novin-panel"><div class="novin-panel-title"><div><h2>آخرین موارد تبادل</h2><p>آخرین موارد در صف و تبادل‌هایی که نرم‌افزار حسابداری دریافت کرده است.</p></div></div>';
-        self::render_latest_exchanges();
-        echo '</section></div>';
-
-        echo '<div class="novin-dashboard-sections">';
-        echo '<section class="novin-panel novin-panel-wide"><div class="novin-panel-title"><div><h2>وضعیت انتشار کالاها</h2><p>این بخش کمک می‌کند سریع ببینید کاتالوگ سایت در چه وضعیتی قرار دارد.</p></div></div><div class="novin-dashboard-stat-grid">';
-        self::stat_tile('منتشرشده', $health['catalog']['products'], 'success', self::icon('check'));
-        self::stat_tile('پیش‌نویس', $health['catalog']['draft'], 'info', self::icon('edit'));
-        self::stat_tile('خصوصی', $health['catalog']['private'], 'warning', self::icon('lock'));
-        self::stat_tile('Variation منتشرشده', $health['catalog']['variations'], 'success', self::icon('layers'));
-        echo '</div></section>';
-
-        echo '<section class="novin-panel novin-panel-wide novin-insights-panel"><div class="novin-panel-title"><div><span class="novin-kicker">WEBPRD INSIGHTS</span><h2>داده‌های قابل تشخیص از حسابداری</h2><p>این شاخص‌ها مستقیماً از داده‌های WebPrd موجود در همین سایت خوانده می‌شوند. تعداد بررسی‌شده: '.number_format_i18n($health['webprd']['sample']).' کالا.</p></div></div><div class="novin-insights-grid">';
-        self::insight_tile('موجودی مثبت',$health['webprd']['insights']['stock_positive'],'کالا با موجودی بیشتر از صفر','green',self::icon('stock'));
-        self::insight_tile('SKU ثبت‌شده',$health['webprd']['insights']['sku'],'دارای Sku در WebPrd','blue',self::icon('sku'));
-        self::insight_tile('بارکد مقداردار',$health['webprd']['insights']['barcode_value'],'دارای BarCode در PrdBarcode','purple',self::icon('barcode'));
-        self::insight_tile('قیمت فروش (Sell1)',$health['webprd']['insights']['sell_price'],'دارای قیمت فروش پایه در WebPrd','amber',self::icon('price'));
-        self::insight_tile('تخفیف زمان‌دار فعال',$health['webprd']['insights']['discount_active'],'DiscountStartDate تا DiscountEndDate','red',self::icon('clock'));
-        self::insight_tile('قیمت نقش‌ها',$health['webprd']['insights']['price_roles'],'دارای PriceRoleList','amber',self::icon('price'));
-        self::insight_tile('گروه کالا',$health['webprd']['insights']['group'],'دارای GuidGroup','teal',self::icon('group'));
-        self::insight_tile('مشخصات فنی',$health['webprd']['insights']['technical'],'دارای PrdTechnicalList','indigo',self::icon('layers'));
-        self::insight_tile('تاریخ Modified',$health['webprd']['insights']['modified'],'دارای زمان آخرین تغییر','indigo',self::icon('clock'));
-        echo '</div></section>';
-
-        echo '<section class="novin-panel novin-panel-wide"><div class="novin-panel-title"><div><h2>بررسی وضعیت تبادل</h2><p>وضعیت هر مورد را ساده و قابل فهم نشان می‌دهیم.</p></div></div><div class="novin-diagnostic-grid">';
-        self::diagnostic('زمان Sync', $health['sync_time']['status']==='success', $health['sync_time']['label'], 'زمان مرجع دریافت اطلاعات از حسابداری.');
-        self::diagnostic('GUID', 0===$health['webprd']['guid_mismatch'], $health['webprd']['guid_mismatch']?'اختلاف پیدا شد':'هماهنگ', 'GUID سایت با GUID داخل WebPrd مقایسه شد.');
-        self::diagnostic('WebPrd', $health['webprd']['valid']===$health['webprd']['sample'], $health['webprd']['valid'].' از '.$health['webprd']['sample'].' معتبر', 'ساختار داده حسابداری بررسی شد.');
-        self::diagnostic('تازه بودن اطلاعات', 0===$health['webprd']['stale'], $health['webprd']['stale']?'نیازمند Sync':'به‌روز', 'Modified حسابداری با زمان Sync سایت مقایسه شد.');
-        echo '</div></section>';
-
-        if ( ! empty($_GET['item_id']) ) self::render_detail(absint($_GET['item_id']), sanitize_key(wp_unslash($_GET['item_type'] ?? '')));
-
-        echo '<div class="novin-dashboard-grid"><section class="novin-panel"><div class="novin-panel-title"><div><h2>آخرین رویدادها</h2><p>برای مشاهده آخرین تغییرات و عملیات انجام‌شده.</p></div></div>';
-        if(!$logs) echo '<div class="novin-empty">هنوز رویدادی ثبت نشده است.</div>'; else foreach($logs as $log){echo '<div class="novin-log-row"><span class="novin-status-dot '.esc_attr($log->status).' "></span><div><strong>'.esc_html(self::event_label($log->event_type)).'</strong><p>'.esc_html($log->message ?: 'بدون توضیح').'</p></div><time>'.esc_html(self::time_label($log->created_at)).'</time></div>';}
-        echo '</section><section class="novin-panel"><div class="novin-panel-title"><div><h2>وضعیت فنی</h2><p>وضعیت‌های مهم ارتباط و بروزرسانی کالاها.</p></div></div><div class="novin-system-grid">';
-        self::metric('WordPress', get_bloginfo('version')); self::metric('PHP', PHP_VERSION); self::metric('WooCommerce', defined('WC_VERSION')?WC_VERSION:'نصب نیست'); self::metric('PHP Memory', ini_get('memory_limit')); self::metric('DB', self::db_name()); self::metric('Schema', get_option('novin_commerce_schema_version','—')); echo '</div></section></div>';
-
-        echo '<section class="novin-panel"><div class="novin-panel-title"><div><h2>ابزارهای رفع مشکل</h2><p>عملیات کم‌ریسک و قابل بازگشت برای پشتیبانی.</p></div></div><div class="novin-tools-grid">';
-        self::tool('جستجوی GUID','از بخش کالاها GUID یا SKU را جستجو کنید.',admin_url('admin.php?page=novin-commerce-products'));
-        self::tool('مغایرت‌گیری','GUIDهای تکراری و نامنطبق را بررسی کنید.',admin_url('admin.php?page=novin-commerce-mismatch'));
-        self::tool('تنظیمات','ارتباط، نقش‌ها و دسترسی پیشخوان را کنترل کنید.',admin_url('admin.php?page=novin-commerce-settings'));
-        self::tool('صف تبادل','موارد گیرکرده را با اولویت بالا دوباره ارسال کنید.',admin_url('admin.php?page=novin-commerce-syncs'));
-        echo '</div></section>';
+        self::render_auto_report();
         echo '</div>';
     }
 
@@ -462,7 +367,7 @@ foreach(self::webprd_detail_rows($d) as $row){self::detail_item($row[0],$row[1],
     private static function stacked_bars($title,$rows){$total=0;foreach($rows as $r)$total+=(int)$r['value'];$total=max(1,$total);echo '<div class="novin-stack-title"><strong>'.esc_html($title).'</strong><span>'.number_format_i18n($total).'</span></div><div class="novin-stack">';foreach($rows as $r){$pct=round(((int)$r['value']/$total)*100,1);echo '<div class="novin-stack-segment '.esc_attr($r['class']).'" style="width:'.$pct.'%" title="'.esc_attr($r['label'].' '.$r['value']).'"></div>';}echo '</div><div class="novin-stack-legend">';foreach($rows as $r){echo '<span><i class="'.esc_attr($r['class']).'"></i>'.esc_html($r['label']).' '.number_format_i18n((int)$r['value']).'</span>';}echo '</div>';}
     private static function tool($t,$d,$u){echo '<a class="novin-tool" href="'.esc_url($u).'"><span>'.self::icon('arrow').'</span><div><strong>'.esc_html($t).'</strong><small>'.esc_html($d).'</small></div></a>';}
     private static function detail_item($l,$v,$s){echo '<div class="novin-detail-item"><span>'.esc_html($l).'</span><strong class="'.esc_attr($s).'">'.esc_html($v).'</strong></div>';}
-    private static function event_label($e){$m=['queued'=>'ورود به صف','requeue'=>'ارسال مجدد با اولویت','synced'=>'دریافت توسط حسابداری','removed'=>'حذف از صف','priority'=>'تغییر اولویت','disconnect'=>'قطع ارتباط','sync_datetime'=>'تغییر زمان Sync','health'=>'بررسی سلامت','stock_sync'=>'اعمال موجودی از حسابداری'];return $m[$e]??ucwords(str_replace('_',' ',(string)$e));}
+    private static function event_label($e){$m=['queued'=>'ورود به صف','requeue'=>'ارسال مجدد با اولویت','synced'=>'دریافت توسط حسابداری','removed'=>'حذف از صف','priority'=>'تغییر اولویت','disconnect'=>'قطع ارتباط','sync_datetime'=>'تغییر زمان Sync','health'=>'بررسی سلامت','stock_sync'=>'اعمال موجودی از حسابداری','auto_stock'=>'همگام‌سازی خودکار موجودی','auto_price'=>'همگام‌سازی خودکار قیمت','auto_structure'=>'همگام‌سازی خودکار ساختار متغیر','auto_variation'=>'پیوند خودکار متغیرها','auto_sync_all'=>'همگام‌سازی خودکار دوره‌ای'];return $m[$e]??ucwords(str_replace('_',' ',(string)$e));}
     private static function db_name(){global $wpdb;return method_exists($wpdb,'db_version')?$wpdb->db_version():'—';}
     private static function critical_css(){
         return '.novin-dashboard{width:100%!important;max-width:1500px!important;margin:0 auto!important;padding:0 16px 40px!important;direction:rtl!important;overflow:visible!important}.novin-dashboard,.novin-dashboard *{box-sizing:border-box!important}.novin-dashboard .novin-dashboard-grid{display:block!important;width:100%!important;max-width:100%!important;margin:0 0 16px!important}.novin-dashboard .novin-dashboard-triple-row{display:grid!important;grid-template-columns:repeat(3,minmax(0,1fr))!important;align-items:stretch!important;width:100%!important;max-width:100%!important;min-width:0!important;gap:16px!important;margin:0 0 16px!important;padding:0!important}.novin-dashboard .novin-dashboard-triple-row>.novin-panel{display:flex!important;flex-direction:column!important;width:auto!important;min-width:0!important;max-width:none!important;margin:0!important;overflow:hidden!important}.novin-dashboard .novin-dashboard-triple-row>.novin-panel>.novin-panel-title{min-height:62px!important;flex:0 0 auto!important}.novin-dashboard .novin-dashboard-triple-row .novin-panel-title>div{min-width:0!important;overflow:hidden!important}.novin-dashboard .novin-dashboard-triple-row .novin-panel-title h2,.novin-dashboard .novin-dashboard-triple-row .novin-panel-title p{overflow-wrap:anywhere!important;word-break:normal!important}.novin-dashboard .novin-dashboard-triple-row .novin-panel-title .button{flex:0 0 auto!important;white-space:nowrap!important}.novin-dashboard .novin-panel-wide{width:100%!important;max-width:100%!important;min-width:0!important;margin-left:0!important;margin-right:0!important}.novin-dashboard .novin-card-icon{width:42px!important;height:42px!important;min-width:42px!important;display:grid!important;place-items:center!important}.novin-dashboard .novin-card-icon svg{display:block!important;width:21px!important;height:21px!important;max-width:21px!important;max-height:21px!important}.novin-dashboard svg{max-width:none!important}.novin-dashboard .novin-stat-icon svg,.novin-dashboard .novin-diagnostic-icon svg,.novin-dashboard .novin-tool>span>svg,.novin-dashboard .novin-insight-icon>svg{display:block!important;width:20px!important;height:20px!important;max-width:20px!important;max-height:20px!important;flex:0 0 20px!important}.novin-dashboard .novin-insight-icon{width:40px!important;height:40px!important;min-width:40px!important;max-width:40px!important;display:grid!important;place-items:center!important;flex:0 0 40px!important;border-radius:12px!important;overflow:hidden!important}.novin-dashboard .novin-insight-icon svg{fill:none!important;stroke:currentColor!important;stroke-width:1.8!important;stroke-linecap:round!important;stroke-linejoin:round!important}.novin-dashboard .novin-insight-tile{display:flex!important;align-items:center!important;gap:12px!important;min-width:0!important;padding:14px!important;border:1px solid #eef2f7!important;border-radius:14px!important;background:#fbfcfe!important;overflow:hidden!important}.novin-dashboard .novin-insight-tile.tone-green,.novin-dashboard .novin-insight-tile.tone-blue,.novin-dashboard .novin-insight-tile.tone-purple,.novin-dashboard .novin-insight-tile.tone-amber,.novin-dashboard .novin-insight-tile.tone-teal,.novin-dashboard .novin-insight-tile.tone-indigo{border-top:1px solid #eef2f7!important;background:#fbfcfe!important;border-radius:14px!important}.novin-dashboard .novin-insight-tile>div{min-width:0!important;overflow:hidden!important}.novin-dashboard .novin-insight-tile span,.novin-dashboard .novin-insight-tile small{display:block!important;color:#64748b!important;font-size:11px!important;line-height:1.6!important;overflow:hidden!important;text-overflow:ellipsis!important}.novin-dashboard .novin-insight-tile strong{display:block!important;font-size:22px!important;line-height:1.2!important;margin:3px 0!important}.novin-dashboard .novin-chart-row-3{display:grid!important;grid-template-columns:repeat(3,minmax(0,1fr))!important;gap:20px!important;min-width:0!important}.novin-dashboard .novin-health-grid-extended{display:grid!important;grid-template-columns:repeat(4,minmax(0,1fr))!important;gap:14px!important}.novin-dashboard .novin-dashboard-stat-grid{display:grid!important;grid-template-columns:repeat(4,minmax(0,1fr))!important;gap:12px!important}.novin-dashboard .novin-diagnostic-grid{display:grid!important;grid-template-columns:repeat(4,minmax(0,1fr))!important;gap:12px!important}.novin-dashboard .novin-tools-grid{display:grid!important;grid-template-columns:repeat(4,minmax(0,1fr))!important;gap:10px!important}.novin-dashboard .novin-system-grid{display:grid!important;grid-template-columns:repeat(3,minmax(0,1fr))!important;gap:9px!important}.novin-dashboard .novin-insights-grid{display:grid!important;grid-template-columns:repeat(3,minmax(0,1fr))!important;gap:12px!important;min-width:0!important}.novin-dashboard > .novin-panel{margin:0 0 18px!important}.novin-dashboard > .novin-dashboard-grid,.novin-dashboard > .novin-dashboard-triple-row{margin-bottom:18px!important}.novin-dashboard > .novin-panel:last-child{margin-bottom:0!important}.novin-dashboard .novin-insights-grid{display:grid!important;grid-template-columns:repeat(3,minmax(0,1fr))!important;gap:14px!important;min-width:0!important}.novin-dashboard .novin-insight-tile{display:flex!important;align-items:center!important;gap:14px!important;min-height:76px!important;padding:15px 16px!important;position:relative!important}.novin-dashboard .novin-insight-copy{min-width:0!important;flex:1 1 auto!important;overflow:hidden!important}.novin-dashboard .novin-insight-line{display:flex!important;align-items:baseline!important;flex-wrap:wrap!important;column-gap:6px!important;row-gap:2px!important;line-height:1.5!important}.novin-dashboard .novin-insight-label{display:inline!important;color:#334155!important;font-size:12px!important;font-weight:600!important;white-space:nowrap!important}.novin-dashboard .novin-insight-line strong{display:inline!important;font-size:22px!important;line-height:1.2!important;margin:0!important;font-weight:800!important}.novin-dashboard .novin-insight-detail{display:inline!important;color:#64748b!important;font-size:11px!important;line-height:1.6!important}.novin-dashboard .novin-insight-icon{box-shadow:0 4px 12px rgba(15,23,42,.06)!important;border:1px solid rgba(255,255,255,.8)!important}.novin-dashboard .novin-donut svg{width:170px!important;height:170px!important;max-width:170px!important;max-height:170px!important}.novin-dashboard .tone-green .novin-insight-icon{color:#15803d!important;background:#ecfdf3!important}.novin-dashboard .tone-blue .novin-insight-icon{color:#2563eb!important;background:#eff6ff!important}.novin-dashboard .tone-purple .novin-insight-icon{color:#7c3aed!important;background:#f5f3ff!important}.novin-dashboard .tone-amber .novin-insight-icon{color:#b45309!important;background:#fffbeb!important}.novin-dashboard .tone-teal .novin-insight-icon{color:#0f766e!important;background:#f0fdfa!important}.novin-dashboard .tone-indigo .novin-insight-icon{color:#4f46e5!important;background:#eef2ff!important}.novin-dashboard .tone-red .novin-insight-icon{color:#dc2626!important;background:#fef2f2!important}@media(max-width:1100px){.novin-dashboard .novin-dashboard-triple-row{grid-template-columns:repeat(2,minmax(0,1fr))!important}.novin-dashboard .novin-chart-row-3{grid-template-columns:repeat(2,minmax(0,1fr))!important}.novin-dashboard .novin-chart-row-3 .novin-chart-card:last-child{grid-column:1/-1!important}.novin-dashboard .novin-insights-grid{grid-template-columns:repeat(2,minmax(0,1fr))!important}.novin-dashboard .novin-dashboard-stat-grid{grid-template-columns:repeat(2,minmax(0,1fr))!important}}@media(max-width:900px){.novin-dashboard .novin-health-grid-extended{grid-template-columns:repeat(2,minmax(0,1fr))!important}.novin-dashboard .novin-dashboard-grid{display:block!important}.novin-dashboard .novin-dashboard-triple-row{grid-template-columns:repeat(2,minmax(0,1fr))!important}}@media(max-width:700px){.novin-dashboard{padding-left:8px!important;padding-right:8px!important}.novin-dashboard .novin-dashboard-triple-row{grid-template-columns:1fr!important}.novin-dashboard .novin-health-grid-extended,.novin-dashboard .novin-chart-row-3,.novin-dashboard .novin-dashboard-stat-grid,.novin-dashboard .novin-diagnostic-grid,.novin-dashboard .novin-tools-grid,.novin-dashboard .novin-system-grid,.novin-dashboard .novin-insights-grid{grid-template-columns:1fr!important}.novin-dashboard .novin-chart-row-3 .novin-chart-card:last-child{grid-column:auto!important}}.novin-dashboard .novin-stack-segment.info{background:#0ea5e9!important}.novin-dashboard .novin-stack-legend i.info{background:#0ea5e9!important}.novin-dashboard .novin-activity-foot{margin-top:12px!important;padding-top:8px!important;border-top:1px solid #eef2f7!important;font-size:11px!important;color:#64748b!important;line-height:1.8!important}.novin-dashboard .novin-exchange-group{display:flex!important;align-items:center!important;gap:8px!important;font-size:11px!important;font-weight:700!important;color:#64748b!important;margin:12px 0 2px!important;white-space:nowrap!important}.novin-dashboard .novin-exchange-group::after{content:"";height:1px!important;background:#eef2f7!important;flex:1!important}';
@@ -473,6 +378,24 @@ foreach(self::webprd_detail_rows($d) as $row){self::detail_item($row[0],$row[1],
      * truthfully tell us about the catalog, rendered with animated charts.
      * All numbers are integers already computed in health(); nothing heavy here.
      */
+    private static function render_auto_report() {
+        $auto_events = array( 'auto_stock', 'auto_price', 'auto_structure', 'auto_variation', 'auto_sync_all', 'stock_sync' );
+        $logs = array();
+        foreach ( (array) SyncLog::recent( 60 ) as $log ) {
+            if ( in_array( $log->event_type, $auto_events, true ) ) {
+                $logs[] = $log;
+                if ( count( $logs ) >= 8 ) break;
+            }
+        }
+        echo '<section class="novin-panel novin-panel-wide"><div class="novin-panel-title"><div><span class="novin-kicker">AUTO SYNC</span><h2>گزارش همگام‌سازی خودکار</h2><p>اعمال خودکار داده‌های WebPrd (موجودی / قیمت / ساختار متغیر) روی کالاها — بدون نیاز به تأیید دستی.</p></div></div>';
+        if ( ! $logs ) {
+            echo '<div class="novin-empty">هنوز عملیات خودکاری ثبت نشده است — هنگام به‌روزرسانی کالا توسط نرم‌افزار حسابداری، تغییرات همین‌جا نمایش داده می‌شود.</div>';
+        } else {
+            foreach($logs as $log){echo '<div class="novin-log-row"><span class="novin-status-dot '.esc_attr($log->status).'"></span><div><strong>'.esc_html(self::event_label($log->event_type)).'</strong><p>'.esc_html($log->message ?: 'بدون توضیح').'</p></div><time>'.esc_html(self::time_label($log->created_at)).'</time></div>';}
+        }
+        echo '</section>';
+    }
+
     private static function render_catalog_summary( $health ) {
         $nv  = isset( $health['nv'] ) && is_array( $health['nv'] ) ? $health['nv'] : [];
         $fresh = isset( $nv['fresh'] ) ? $nv['fresh'] : [ 'h24'=>0,'d7'=>0,'d30'=>0,'old'=>0,'none'=>0 ];
@@ -571,18 +494,14 @@ foreach(self::webprd_detail_rows($d) as $row){self::detail_item($row[0],$row[1],
         echo '</div>';
         // --- issues ---
         $total_mis = $st_mis + $st_dif;
-        echo '<div class="nv-issues"><div style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;margin-bottom:2px"><strong style="font-size:12px;color:#334155">نمونه‌هایی که موجودی‌شان در سایت هماهنگ نیست (بالاترین اولویت بررسی):</strong>';
-        if($total_mis>0){
-            echo '<form method="post" style="margin:0"><div class="nv-applyrow">'.wp_nonce_field('novin_dashboard_action','_wpnonce',true,false).'<input type="hidden" name="novin_dashboard_action" value="apply_stock_all"><button class="button button-primary" style="font-size:11px">اعمال موجودی حسابداری روی همه‌ٔ موارد ('.number_format_i18n($total_mis).')</button><span style="font-size:11px;color:#64748b">موجودی از WebPrd (جمع Amount در PrdAnbarRelation) در stock_quantity کالا نوشته می‌شود.</span></div></form>';
-        }
-        echo '</div>';
+        echo '<div class="nv-issues"><div style="margin-bottom:2px"><strong style="font-size:12px;color:#334155">کالاهایی که موجودی‌شان هنوز با حسابداری هماهنگ نشده:</strong></div>';
+        echo '<div style="font-size:11px;color:#64748b;line-height:1.8;margin:0 0 6px">همگام‌سازی موجودی خودکار است: هنگام به‌روزرسانی کالا توسط نرم‌افزار حسابداری یا در اولین بازدید داشبورد، موجودی حسابداری (جمع Amount در PrdAnbarRelation) روی کالا اعمال می‌شود — بدون نیاز به تأیید.</div>';
         if($issues){
             foreach($issues as $it){
                 $itype = ( isset($it['type']) && 'product_variation' === $it['type'] ) ? 'variation' : 'product';
                 $ttl=self::item_title( $itype, (int)$it['id'] );
                 $wv = isset($it['w']) && $it['w']!==null ? number_format_i18n((float)$it['w']) : 'ثبت نشده';
-                $form = '<form method="post" style="margin:0">'.wp_nonce_field('novin_dashboard_action','_wpnonce',true,false).'<input type="hidden" name="novin_dashboard_action" value="apply_stock"><input type="hidden" name="item_id" value="'.absint($it['id']).'"><input type="hidden" name="item_type" value="'.esc_attr($itype).'"><button class="button" title="اعمال موجودی حسابداری روی این کالا">اعمال موجودی</button></form>';
-                echo '<div class="nv-issue"><span class="nm">'.esc_html($ttl).'</span><span style="display:flex;gap:6px;align-items:center;flex-wrap:wrap"><span class="nv-badge grn">حسابداری: '.esc_html(number_format_i18n((float)$it['a'])).'</span><span class="nv-badge red">سایت: '.esc_html($wv).'</span>'.$form.'</span></div>';
+                                echo '<div class="nv-issue"><span class="nm">'.esc_html($ttl).'</span><span style="display:flex;gap:6px;align-items:center;flex-wrap:wrap"><span class="nv-badge grn">حسابداری: '.esc_html(number_format_i18n((float)$it['a'])).'</span><span class="nv-badge red">سایت: '.esc_html($wv).'</span>&nbsp;<span class="nv-badge">اصلاح خودکار در نوبت</span></div>';
             }
         } else {
             echo '<div class="nv-issue"><span class="nm" style="color:#94a3b8">همهٔ کالاهای نمونه هماهنگ‌اند یا موجودی حسابداری ندارند.</span></div>';

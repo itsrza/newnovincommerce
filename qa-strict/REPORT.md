@@ -1,4 +1,4 @@
-# Novin Commerce 1.10.14 — گزارش ۱۰۰ تست سخت‌گیرانه
+# Novin Commerce 1.10.15 — گزارش ۱۰۰ تست سخت‌گیرانه
 
 - تاریخ اجرا: 2026-09-06 (sandbox، منطقه UTC)
 - نتیجه: **100/100 تست موفق**
@@ -43,7 +43,7 @@ REST و رندر مرورگر ممکن نبود. همهٔ مسیرهای قاب�
 - [x] `T027` SyncLog::add refreshes dashboard cache
 - [x] `T028` REST deleteSync records completed exchange
 - [x] `T029` no per-type Eloquent COUNT queries left in dashboard render
-- [x] `T030` queue panel reads grouped counts with total + safe fallback
+- [x] `T030` queue aggregates computed once from the grouped SQL inside health()
 - [x] `T031` dashboard activity buckets: success/warning/error/info
 - [x] `T032` activity uses singular error key consistently
 - [x] `T033` wpdb->prepare placeholder/argument parity across lib SQL
@@ -73,7 +73,7 @@ REST و رندر مرورگر ممکن نبود. همهٔ مسیرهای قاب�
 - [x] `T057` pipeline latest activity matches dashboard SQL
 - [x] `T058` exchange row title helpers use WooCommerce/WP APIs
 - [x] `T059` time rendering converts UTC to site timezone
-- [x] `T060` latest-exchanges renderer balanced, split by synced/removed
+- [x] `T060` redesigned dashboard: auto-sync report + catalog snapshot; legacy panels removed
 - [x] `T061` live product WebPrd payload decodes to an object
 - [x] `T062` required WebPrd fields exist in the live payload
 - [x] `T063` Sku/Slug strings
@@ -87,7 +87,7 @@ REST و رندر مرورگر ممکن نبود. همهٔ مسیرهای قاب�
 - [x] `T071` WebPrd meta key consistent between writers and dashboard
 - [x] `T072` guid meta key consistent across plugin
 - [x] `T073` product detail panel exposes Code/SKU/Group/Vahed/Sell1/Barcodes from WebPrd
-- [x] `T074` dashboard insight tiles cover new WebPrd metrics
+- [x] `T074` catalog-snapshot chips cover the real WebPrd metrics
 - [x] `T075` no unguarded $d[key] reads in dashboard
 - [x] `T076` permission_callback present on all but the public version route
 - [x] `T077` deleteSync error paths preserved
@@ -105,10 +105,10 @@ REST و رندر مرورگر ممکن نبود. همهٔ مسیرهای قاب�
 - [x] `T089` composer.json/lock/installed.json/morilog composer.json valid JSON
 - [x] `T090` jdate helpers.php absent from all composer files-autoload registrations
 - [x] `T091` Jalalian PSR-4 autoload entry intact
-- [x] `T092` version 1.10.14 consistent in header/class/README/CHANGELOG/cache-buster
+- [x] `T092` version 1.10.15 consistent in header/class/README/CHANGELOG/cache-buster
 - [x] `T093` release zip valid; entries under single novin-commerce/ root; versioned; jdate fix
 - [x] `T094` zip has no top-level strays or repository junk
-- [x] `T095` dashboard helpers + catalog-summary JS + stock-apply shipped inside zip
+- [x] `T095` dashboard helpers + auto-sync engine + catalog JS shipped inside zip
 - [x] `T096` REST deleteSync log shipped in zip
 - [x] `T097` cache-flush fixes shipped in zip
 - [x] `T098` every shipped PHP folder has an index.php silencer

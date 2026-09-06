@@ -47,8 +47,8 @@ if hasattr(_t, 'tzset'):
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 PLUGIN = os.path.join(ROOT, 'novin-commerce')
-ZIP_PATH = os.path.join(ROOT, 'NovinCommerce-1.10.14.zip')
-VERSION = '1.10.14'
+ZIP_PATH = os.path.join(ROOT, 'NovinCommerce-1.10.15.zip')
+VERSION = '1.10.15'
 
 RESULTS = []
 FAILED = []
@@ -586,8 +586,9 @@ def test_group_schema_queue():
     check('T029', n_eloquent == 0, 'no per-type Eloquent COUNT queries left in dashboard render',
           '%d found' % n_eloquent)
 
-    check('T030', "$queue_counts['_total']" in DASH and "isset($queue_counts[$type])" in DASH,
-          'queue panel reads grouped counts with total + safe fallback')
+    check('T030', 'SELECT item_type, COUNT(*) AS total FROM {$wpdb->prefix}novin_commerce_syncs GROUP BY item_type' in DASH
+          and "$queue_counts['_total']=$all;" in DASH,
+          'queue aggregates computed once from the grouped SQL inside health()')
 
     ok31 = all(st in DASH for st in ["'success'", "'warning'", "'error'", "'info'"])
     check('T031', ok31, 'dashboard activity buckets: success/warning/error/info')
@@ -756,12 +757,13 @@ def test_group_dashboard():
           'time rendering converts UTC to site timezone')
 
     # render_latest_exchanges + helpers structural sanity
-    ok60 = balanced(DASH)[0] and DASH.count('exchange_row_html') >= 3 \
-        and 'در انتظار در صف' in DASH and 'دریافت‌شده توسط حسابداری' in DASH \
-        and 'حذف‌شده از صف (به حسابداری ارسال نشده)' in DASH \
-        and "event_type='synced'" in DASH and "event_type='removed'" in DASH \
-        and 'نیازمند بررسی (WebPrd)' in DASH and "'issues'" in DASH
-    check('T060', ok60, 'latest-exchanges renderer balanced, split by synced/removed')
+    ok60 = balanced(DASH)[0] \
+        and 'render_auto_report' in DASH and 'گزارش همگام‌سازی خودکار' in DASH \
+        and 'خلاصهٔ کاتالوگ — حسابداری × ووکامرس' in DASH \
+        and 'کالاهایی که موجودی‌شان هنوز با حسابداری هماهنگ نشده' in DASH \
+        and 'تصویر کلی فروشگاه' not in DASH and 'آخرین رویدادها' not in DASH \
+        and 'وضعیت فنی' not in DASH
+    check('T060', ok60, 'redesigned dashboard: auto-sync report + catalog snapshot; legacy panels removed')
 
 
 def test_group_webprd():
@@ -830,12 +832,11 @@ def test_group_webprd():
     else:
         check('T073', True, 'product detail panel exposes Code/SKU/Group/Vahed/Sell1/Barcodes from WebPrd')
 
-    for lbl in ['بارکد مقداردار', 'قیمت فروش (Sell1)', 'تخفیف زمان‌دار فعال', 'مشخصات فنی']:
-        if lbl not in DASH:
-            check('T074', False, 'insight tile %s' % lbl)
-            break
+    chips = ['کل کاتالوگ', 'دارای WebPrd', 'JSON نامعتبر', 'بدون GUID سایت', 'موجودی هماهنگ', 'اختلاف موجودی']
+    if all(lbl in DASH for lbl in chips):
+        check('T074', True, 'catalog-snapshot chips cover the real WebPrd metrics')
     else:
-        check('T074', True, 'dashboard insight tiles cover new WebPrd metrics')
+        check('T074', False, 'catalog-snapshot chips missing: %s' % ([l for l in chips if l not in DASH]))
 
     unguarded = []
     for line_no, line in enumerate(DASH.splitlines(), 1):
@@ -936,7 +937,7 @@ def test_group_composer_version_zip():
         and ("protected $version = '" + VERSION + "';") in file_text('lib/Plugin.php') \
         and ('**نسخه:** ' + VERSION) in readme \
         and ('## ' + VERSION) in changelog \
-        and ('1.10.14-dash14') in DASH
+        and ('1.10.15-dash15') in DASH
     check('T092', ok92, 'version ' + VERSION + ' consistent in header/class/README/CHANGELOG/cache-buster')
 
     if not os.path.exists(ZIP_PATH):
@@ -965,8 +966,9 @@ def test_group_composer_version_zip():
         zd = zf.read('novin-commerce/lib/Admin/Connection_Dashboard.php').decode('utf-8')
         zhas_js = 'novin-commerce/dist/scripts/admin/dashboard.js' in znames
         check('T095', 'render_latest_exchanges' in zd and 'webprd_detail_rows' in zd
-              and 'render_catalog_summary' in zd and 'apply_accounting_stock' in zd and zhas_js,
-              'dashboard helpers + catalog-summary JS + stock-apply shipped inside zip')
+              and 'render_catalog_summary' in zd and 'render_auto_report' in zd and zhas_js
+              and 'novin-commerce/lib/Common/WebPrd_Applier.php' in znames,
+              'dashboard helpers + auto-sync engine + catalog JS shipped inside zip')
 
         zrc = zf.read('novin-commerce/lib/Common/Novin_REST_Controller.php').decode('utf-8')
         check('T096', "'synced', 'success', $item_type, $item_id" in zrc, 'REST deleteSync log shipped in zip')
