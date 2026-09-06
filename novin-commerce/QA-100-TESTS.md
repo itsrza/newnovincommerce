@@ -1,4 +1,4 @@
-# Novin Commerce 1.10.13 — QA Audit
+# Novin Commerce 1.10.14 — QA Audit
 
 ## Result
 
@@ -11,7 +11,7 @@
 - **WebPrd JSON contract:** decoded against the real live product payload (the shop owner's REST example); every key the dashboard reads (Guid, Sku, Mojodi, Sell1/Sell8, Prices, PriceRoleList, PrdBarcode, GuidGroup/GuidVahed, PrdTechnicalList, ImageListData, Modified, Version, …) must exist with the expected shape.
 - **Security:** nonce + capability checks on all admin POST handlers, escaping of every dynamic output in the new dashboard rows, no dangerous PHP primitives, bounded REST paging, and REST `permission_callback` coverage.
 - **Composer/autoload/package integrity:** the global `jdate()` helper file is absent from every Composer `files` autoload registration (composer.lock, installed.json, package composer.json, generated autoload files) while `Morilog\Jalali\Jalalian` stays PSR-4 — the 1.10.10 fatal-error fix cannot regress; version metadata is consistent everywhere.
-- **Release zip layout (new in 1.10.13):** every archive entry lives under the single root folder `novin-commerce/` — no top-level PHP files or stray entries — so WordPress «بارگذاری افزونه» updates the existing plugin instead of creating a second, un-activatable copy; and the zip is valid, versioned, and carries the dashboard/rest/composer fixes.
+- **Release zip layout (new in 1.10.14):** every archive entry lives under the single root folder `novin-commerce/` — no top-level PHP files or stray entries — so WordPress «بارگذاری افزونه» updates the existing plugin instead of creating a second, un-activatable copy; and the zip is valid, versioned, and carries the dashboard/rest/composer fixes.
 
 ### Important limitation
 

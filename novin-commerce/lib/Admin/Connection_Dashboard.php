@@ -9,9 +9,9 @@ class Connection_Dashboard {
     public static function render() {
         if ( ! current_user_can( 'manage_options' ) ) wp_die( esc_html__( 'دسترسی غیرمجاز.', 'novin-commerce' ) );
         $plugin_file = dirname( __DIR__, 2 ) . '/novin-commerce.php';
-        wp_enqueue_style( 'novin-commerce-admin-table', plugins_url( 'dist/styles/admin/table.min.css', $plugin_file ), [], '1.10.13-dash13' );
+        wp_enqueue_style( 'novin-commerce-admin-table', plugins_url( 'dist/styles/admin/table.min.css', $plugin_file ), [], '1.10.14-dash14' );
         wp_add_inline_style( 'novin-commerce-admin-table', self::critical_css() );
-        wp_enqueue_script( 'novin-commerce-dashboard-js', plugins_url( 'dist/scripts/admin/dashboard.js', $plugin_file ), [], '1.10.13-dash13', true );
+        wp_enqueue_script( 'novin-commerce-dashboard-js', plugins_url( 'dist/scripts/admin/dashboard.js', $plugin_file ), [], '1.10.14-dash14', true );
         $started = microtime( true );
         self::handle_actions();
         $health = self::health();
@@ -386,6 +386,47 @@ foreach(self::webprd_detail_rows($d) as $row){self::detail_item($row[0],$row[1],
         echo '<form method="post">'.wp_nonce_field('novin_dashboard_action','_wpnonce',true,false).'<input type="hidden" name="novin_dashboard_action" value="requeue"><input type="hidden" name="item_id" value="'.absint($id).'"><input type="hidden" name="item_type" value="'.esc_attr($type).'"><button class="button">ارسال مجدد در صف</button></form>';
         echo '</div></section>';
     }
+    /**
+     * Write the accounting stock (sum of Amount inside PrdAnbarRelation of
+     * the WebPrd meta — the field the live payload actually uses, e.g.
+     * Amount:7.0) into the WooCommerce product stock. $only_id=0 applies to
+     * every sampled product whose accounting stock differs from the site.
+     */
+    private static function apply_accounting_stock( $only_id = 0 ) {
+        if ( ! function_exists( 'wc_get_product' ) || ! function_exists( 'wc_update_product_stock' ) ) return 0;
+        global $wpdb;
+        $only_id = absint( $only_id );
+        $q = "SELECT p.ID,w.meta_value webprd,st.meta_value wc_stock FROM {$wpdb->posts} p LEFT JOIN {$wpdb->postmeta} w ON w.post_id=p.ID AND w.meta_key='WebPrd' LEFT JOIN {$wpdb->postmeta} st ON st.post_id=p.ID AND st.meta_key='_stock' WHERE p.post_type IN ('product','product_variation') AND p.post_status='publish' AND w.meta_value<>''";
+        if ( $only_id ) $q .= $wpdb->prepare( ' AND p.ID=%d', $only_id );
+        $q .= ' ORDER BY p.ID DESC LIMIT 150';
+        $done = 0; $bad = 0;
+        foreach ( (array) $wpdb->get_results( $q ) as $r ) {
+            $d = json_decode( (string) $r->webprd, true, 12 );
+            if ( ! is_array( $d ) ) continue;
+            $amount = 0.0; $has = false;
+            if(!empty($d['PrdAnbarRelation'])&&is_array($d['PrdAnbarRelation'])){
+                foreach($d['PrdAnbarRelation'] as $rel){
+                    if ( is_array( $rel ) && isset( $rel['Amount'] ) && is_numeric( $rel['Amount'] ) ) { $amount += (float) $rel['Amount']; $has = true; }
+                }
+            }
+            if ( ! $has ) continue;
+            $current = null;
+            if ( isset( $r->wc_stock ) && $r->wc_stock !== null && $r->wc_stock !== '' && is_numeric( $r->wc_stock ) ) $current = (float) $r->wc_stock;
+            if ( $current !== null && abs( $current - $amount ) < 0.005 ) continue;
+            if ( $bad >= 5 ) continue;
+            $prod = wc_get_product( (int) $r->ID );
+            if ( ! $prod ) continue;
+            try {
+                wc_update_product_stock( $prod, $amount );
+                $done++;
+                SyncLog::add( 'stock_sync', 'success', $prod->is_type( 'variation' ) ? 'variation' : 'product', (int) $r->ID, 'موجودی حسابداری اعمال شد: '.number_format_i18n( $amount ).' عدد (از PrdAnbarRelation).' );
+            } catch ( \Throwable $e ) {
+                $bad++;
+            }
+        }
+        return $done;
+    }
+
     private static function handle_actions(){
         if(empty($_POST['novin_dashboard_action']))return;
         if(!current_user_can('manage_options'))wp_die('Unauthorized');
@@ -397,6 +438,16 @@ foreach(self::webprd_detail_rows($d) as $row){self::detail_item($row[0],$row[1],
             Sync::requeue($id,$type,10);
             delete_transient('novin_commerce_health_v3');
             AdminNotice::addSuccessDismissible('مورد دوباره در صف تبادل قرار گرفت.');
+        }
+        if('apply_stock'===$a&&$id){
+            $n=self::apply_accounting_stock($id);
+            Sync::flushHealthCache();
+            AdminNotice::addSuccessDismissible($n>0?('موجودی حسابداری روی '.number_format_i18n($n).' کالا اعمال شد.'):'موجودی حسابداری این کالا در WebPrd موجود نیست یا از قبل هماهنگ است.');
+        }
+        if('apply_stock_all'===$a){
+            $n=self::apply_accounting_stock(0);
+            Sync::flushHealthCache();
+            AdminNotice::addSuccessDismissible($n>0?('موجودی حسابداری (جمع Amount در PrdAnbarRelation) روی '.number_format_i18n($n).' کالای دارای اختلاف اعمال شد.'):'موردی برای اعمال موجودی نمانده بود — همه هماهنگ‌اند یا WebPrd موجودی ندارد.');
         }
         wp_safe_redirect(wp_get_referer()?:admin_url('admin.php?page=novin-commerce-dashboard'));exit;
     }
@@ -411,7 +462,7 @@ foreach(self::webprd_detail_rows($d) as $row){self::detail_item($row[0],$row[1],
     private static function stacked_bars($title,$rows){$total=0;foreach($rows as $r)$total+=(int)$r['value'];$total=max(1,$total);echo '<div class="novin-stack-title"><strong>'.esc_html($title).'</strong><span>'.number_format_i18n($total).'</span></div><div class="novin-stack">';foreach($rows as $r){$pct=round(((int)$r['value']/$total)*100,1);echo '<div class="novin-stack-segment '.esc_attr($r['class']).'" style="width:'.$pct.'%" title="'.esc_attr($r['label'].' '.$r['value']).'"></div>';}echo '</div><div class="novin-stack-legend">';foreach($rows as $r){echo '<span><i class="'.esc_attr($r['class']).'"></i>'.esc_html($r['label']).' '.number_format_i18n((int)$r['value']).'</span>';}echo '</div>';}
     private static function tool($t,$d,$u){echo '<a class="novin-tool" href="'.esc_url($u).'"><span>'.self::icon('arrow').'</span><div><strong>'.esc_html($t).'</strong><small>'.esc_html($d).'</small></div></a>';}
     private static function detail_item($l,$v,$s){echo '<div class="novin-detail-item"><span>'.esc_html($l).'</span><strong class="'.esc_attr($s).'">'.esc_html($v).'</strong></div>';}
-    private static function event_label($e){$m=['queued'=>'ورود به صف','requeue'=>'ارسال مجدد با اولویت','synced'=>'دریافت توسط حسابداری','removed'=>'حذف از صف','priority'=>'تغییر اولویت','disconnect'=>'قطع ارتباط','sync_datetime'=>'تغییر زمان Sync','health'=>'بررسی سلامت'];return $m[$e]??ucwords(str_replace('_',' ',(string)$e));}
+    private static function event_label($e){$m=['queued'=>'ورود به صف','requeue'=>'ارسال مجدد با اولویت','synced'=>'دریافت توسط حسابداری','removed'=>'حذف از صف','priority'=>'تغییر اولویت','disconnect'=>'قطع ارتباط','sync_datetime'=>'تغییر زمان Sync','health'=>'بررسی سلامت','stock_sync'=>'اعمال موجودی از حسابداری'];return $m[$e]??ucwords(str_replace('_',' ',(string)$e));}
     private static function db_name(){global $wpdb;return method_exists($wpdb,'db_version')?$wpdb->db_version():'—';}
     private static function critical_css(){
         return '.novin-dashboard{width:100%!important;max-width:1500px!important;margin:0 auto!important;padding:0 16px 40px!important;direction:rtl!important;overflow:visible!important}.novin-dashboard,.novin-dashboard *{box-sizing:border-box!important}.novin-dashboard .novin-dashboard-grid{display:block!important;width:100%!important;max-width:100%!important;margin:0 0 16px!important}.novin-dashboard .novin-dashboard-triple-row{display:grid!important;grid-template-columns:repeat(3,minmax(0,1fr))!important;align-items:stretch!important;width:100%!important;max-width:100%!important;min-width:0!important;gap:16px!important;margin:0 0 16px!important;padding:0!important}.novin-dashboard .novin-dashboard-triple-row>.novin-panel{display:flex!important;flex-direction:column!important;width:auto!important;min-width:0!important;max-width:none!important;margin:0!important;overflow:hidden!important}.novin-dashboard .novin-dashboard-triple-row>.novin-panel>.novin-panel-title{min-height:62px!important;flex:0 0 auto!important}.novin-dashboard .novin-dashboard-triple-row .novin-panel-title>div{min-width:0!important;overflow:hidden!important}.novin-dashboard .novin-dashboard-triple-row .novin-panel-title h2,.novin-dashboard .novin-dashboard-triple-row .novin-panel-title p{overflow-wrap:anywhere!important;word-break:normal!important}.novin-dashboard .novin-dashboard-triple-row .novin-panel-title .button{flex:0 0 auto!important;white-space:nowrap!important}.novin-dashboard .novin-panel-wide{width:100%!important;max-width:100%!important;min-width:0!important;margin-left:0!important;margin-right:0!important}.novin-dashboard .novin-card-icon{width:42px!important;height:42px!important;min-width:42px!important;display:grid!important;place-items:center!important}.novin-dashboard .novin-card-icon svg{display:block!important;width:21px!important;height:21px!important;max-width:21px!important;max-height:21px!important}.novin-dashboard svg{max-width:none!important}.novin-dashboard .novin-stat-icon svg,.novin-dashboard .novin-diagnostic-icon svg,.novin-dashboard .novin-tool>span>svg,.novin-dashboard .novin-insight-icon>svg{display:block!important;width:20px!important;height:20px!important;max-width:20px!important;max-height:20px!important;flex:0 0 20px!important}.novin-dashboard .novin-insight-icon{width:40px!important;height:40px!important;min-width:40px!important;max-width:40px!important;display:grid!important;place-items:center!important;flex:0 0 40px!important;border-radius:12px!important;overflow:hidden!important}.novin-dashboard .novin-insight-icon svg{fill:none!important;stroke:currentColor!important;stroke-width:1.8!important;stroke-linecap:round!important;stroke-linejoin:round!important}.novin-dashboard .novin-insight-tile{display:flex!important;align-items:center!important;gap:12px!important;min-width:0!important;padding:14px!important;border:1px solid #eef2f7!important;border-radius:14px!important;background:#fbfcfe!important;overflow:hidden!important}.novin-dashboard .novin-insight-tile.tone-green,.novin-dashboard .novin-insight-tile.tone-blue,.novin-dashboard .novin-insight-tile.tone-purple,.novin-dashboard .novin-insight-tile.tone-amber,.novin-dashboard .novin-insight-tile.tone-teal,.novin-dashboard .novin-insight-tile.tone-indigo{border-top:1px solid #eef2f7!important;background:#fbfcfe!important;border-radius:14px!important}.novin-dashboard .novin-insight-tile>div{min-width:0!important;overflow:hidden!important}.novin-dashboard .novin-insight-tile span,.novin-dashboard .novin-insight-tile small{display:block!important;color:#64748b!important;font-size:11px!important;line-height:1.6!important;overflow:hidden!important;text-overflow:ellipsis!important}.novin-dashboard .novin-insight-tile strong{display:block!important;font-size:22px!important;line-height:1.2!important;margin:3px 0!important}.novin-dashboard .novin-chart-row-3{display:grid!important;grid-template-columns:repeat(3,minmax(0,1fr))!important;gap:20px!important;min-width:0!important}.novin-dashboard .novin-health-grid-extended{display:grid!important;grid-template-columns:repeat(4,minmax(0,1fr))!important;gap:14px!important}.novin-dashboard .novin-dashboard-stat-grid{display:grid!important;grid-template-columns:repeat(4,minmax(0,1fr))!important;gap:12px!important}.novin-dashboard .novin-diagnostic-grid{display:grid!important;grid-template-columns:repeat(4,minmax(0,1fr))!important;gap:12px!important}.novin-dashboard .novin-tools-grid{display:grid!important;grid-template-columns:repeat(4,minmax(0,1fr))!important;gap:10px!important}.novin-dashboard .novin-system-grid{display:grid!important;grid-template-columns:repeat(3,minmax(0,1fr))!important;gap:9px!important}.novin-dashboard .novin-insights-grid{display:grid!important;grid-template-columns:repeat(3,minmax(0,1fr))!important;gap:12px!important;min-width:0!important}.novin-dashboard > .novin-panel{margin:0 0 18px!important}.novin-dashboard > .novin-dashboard-grid,.novin-dashboard > .novin-dashboard-triple-row{margin-bottom:18px!important}.novin-dashboard > .novin-panel:last-child{margin-bottom:0!important}.novin-dashboard .novin-insights-grid{display:grid!important;grid-template-columns:repeat(3,minmax(0,1fr))!important;gap:14px!important;min-width:0!important}.novin-dashboard .novin-insight-tile{display:flex!important;align-items:center!important;gap:14px!important;min-height:76px!important;padding:15px 16px!important;position:relative!important}.novin-dashboard .novin-insight-copy{min-width:0!important;flex:1 1 auto!important;overflow:hidden!important}.novin-dashboard .novin-insight-line{display:flex!important;align-items:baseline!important;flex-wrap:wrap!important;column-gap:6px!important;row-gap:2px!important;line-height:1.5!important}.novin-dashboard .novin-insight-label{display:inline!important;color:#334155!important;font-size:12px!important;font-weight:600!important;white-space:nowrap!important}.novin-dashboard .novin-insight-line strong{display:inline!important;font-size:22px!important;line-height:1.2!important;margin:0!important;font-weight:800!important}.novin-dashboard .novin-insight-detail{display:inline!important;color:#64748b!important;font-size:11px!important;line-height:1.6!important}.novin-dashboard .novin-insight-icon{box-shadow:0 4px 12px rgba(15,23,42,.06)!important;border:1px solid rgba(255,255,255,.8)!important}.novin-dashboard .novin-donut svg{width:170px!important;height:170px!important;max-width:170px!important;max-height:170px!important}.novin-dashboard .tone-green .novin-insight-icon{color:#15803d!important;background:#ecfdf3!important}.novin-dashboard .tone-blue .novin-insight-icon{color:#2563eb!important;background:#eff6ff!important}.novin-dashboard .tone-purple .novin-insight-icon{color:#7c3aed!important;background:#f5f3ff!important}.novin-dashboard .tone-amber .novin-insight-icon{color:#b45309!important;background:#fffbeb!important}.novin-dashboard .tone-teal .novin-insight-icon{color:#0f766e!important;background:#f0fdfa!important}.novin-dashboard .tone-indigo .novin-insight-icon{color:#4f46e5!important;background:#eef2ff!important}.novin-dashboard .tone-red .novin-insight-icon{color:#dc2626!important;background:#fef2f2!important}@media(max-width:1100px){.novin-dashboard .novin-dashboard-triple-row{grid-template-columns:repeat(2,minmax(0,1fr))!important}.novin-dashboard .novin-chart-row-3{grid-template-columns:repeat(2,minmax(0,1fr))!important}.novin-dashboard .novin-chart-row-3 .novin-chart-card:last-child{grid-column:1/-1!important}.novin-dashboard .novin-insights-grid{grid-template-columns:repeat(2,minmax(0,1fr))!important}.novin-dashboard .novin-dashboard-stat-grid{grid-template-columns:repeat(2,minmax(0,1fr))!important}}@media(max-width:900px){.novin-dashboard .novin-health-grid-extended{grid-template-columns:repeat(2,minmax(0,1fr))!important}.novin-dashboard .novin-dashboard-grid{display:block!important}.novin-dashboard .novin-dashboard-triple-row{grid-template-columns:repeat(2,minmax(0,1fr))!important}}@media(max-width:700px){.novin-dashboard{padding-left:8px!important;padding-right:8px!important}.novin-dashboard .novin-dashboard-triple-row{grid-template-columns:1fr!important}.novin-dashboard .novin-health-grid-extended,.novin-dashboard .novin-chart-row-3,.novin-dashboard .novin-dashboard-stat-grid,.novin-dashboard .novin-diagnostic-grid,.novin-dashboard .novin-tools-grid,.novin-dashboard .novin-system-grid,.novin-dashboard .novin-insights-grid{grid-template-columns:1fr!important}.novin-dashboard .novin-chart-row-3 .novin-chart-card:last-child{grid-column:auto!important}}.novin-dashboard .novin-stack-segment.info{background:#0ea5e9!important}.novin-dashboard .novin-stack-legend i.info{background:#0ea5e9!important}.novin-dashboard .novin-activity-foot{margin-top:12px!important;padding-top:8px!important;border-top:1px solid #eef2f7!important;font-size:11px!important;color:#64748b!important;line-height:1.8!important}.novin-dashboard .novin-exchange-group{display:flex!important;align-items:center!important;gap:8px!important;font-size:11px!important;font-weight:700!important;color:#64748b!important;margin:12px 0 2px!important;white-space:nowrap!important}.novin-dashboard .novin-exchange-group::after{content:"";height:1px!important;background:#eef2f7!important;flex:1!important}';
@@ -482,6 +533,7 @@ foreach(self::webprd_detail_rows($d) as $row){self::detail_item($row[0],$row[1],
 .nv-issues{margin-top:14px!important;border-top:1px dashed #e2e8f0!important;padding-top:10px!important}
 .nv-issue{display:flex!important;align-items:center!important;justify-content:space-between!important;gap:8px!important;padding:6px 2px!important;font-size:12px!important;border-bottom:1px solid #f6f8fb!important}
 .nv-issue .nm{color:#334155!important;overflow:hidden!important;text-overflow:ellipsis!important;white-space:nowrap!important;max-width:42%!important}
+.nv-issue form{margin:0!important}.nv-issue form .button{font-size:10.5px!important;line-height:1.7!important;min-height:24px!important;margin:0!important}.nv-applyrow{display:flex!important;align-items:center!important;gap:10px!important;flex-wrap:wrap!important;margin:2px 0 6px!important}
 .nv-badge{font-size:10.5px!important;font-weight:700!important;padding:3px 8px!important;border-radius:99px!important;white-space:nowrap!important}
 .nv-badge.red{background:#fef2f2!important;color:#b91c1c!important;border:1px solid #fecaca!important}
 .nv-badge.grn{background:#f0fdf4!important;color:#15803d!important;border:1px solid #bbf7d0!important}
@@ -518,12 +570,19 @@ foreach(self::webprd_detail_rows($d) as $row){self::detail_item($row[0],$row[1],
 
         echo '</div>';
         // --- issues ---
-        echo '<div class="nv-issues"><div style="font-size:12px;font-weight:700;color:#334155;margin-bottom:2px">نمونه‌هایی که موجودی‌شان در سایت هماهنگ نیست (بالاترین اولویت بررسی):</div>';
+        $total_mis = $st_mis + $st_dif;
+        echo '<div class="nv-issues"><div style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;margin-bottom:2px"><strong style="font-size:12px;color:#334155">نمونه‌هایی که موجودی‌شان در سایت هماهنگ نیست (بالاترین اولویت بررسی):</strong>';
+        if($total_mis>0){
+            echo '<form method="post" style="margin:0"><div class="nv-applyrow">'.wp_nonce_field('novin_dashboard_action','_wpnonce',true,false).'<input type="hidden" name="novin_dashboard_action" value="apply_stock_all"><button class="button button-primary" style="font-size:11px">اعمال موجودی حسابداری روی همه‌ٔ موارد ('.number_format_i18n($total_mis).')</button><span style="font-size:11px;color:#64748b">موجودی از WebPrd (جمع Amount در PrdAnbarRelation) در stock_quantity کالا نوشته می‌شود.</span></div></form>';
+        }
+        echo '</div>';
         if($issues){
             foreach($issues as $it){
-                $ttl=self::item_title( isset($it['type'])&&'variation'===$it['type']?'variation':'product', (int)$it['id'] );
+                $itype = ( isset($it['type']) && 'product_variation' === $it['type'] ) ? 'variation' : 'product';
+                $ttl=self::item_title( $itype, (int)$it['id'] );
                 $wv = isset($it['w']) && $it['w']!==null ? number_format_i18n((float)$it['w']) : 'ثبت نشده';
-                echo '<div class="nv-issue"><span class="nm">'.esc_html($ttl).'</span><span style="display:flex;gap:6px;align-items:center"><span class="nv-badge grn">حسابداری: '.esc_html(number_format_i18n((float)$it['a'])).'</span><span class="nv-badge red">سایت: '.esc_html($wv).'</span></span></div>';
+                $form = '<form method="post" style="margin:0">'.wp_nonce_field('novin_dashboard_action','_wpnonce',true,false).'<input type="hidden" name="novin_dashboard_action" value="apply_stock"><input type="hidden" name="item_id" value="'.absint($it['id']).'"><input type="hidden" name="item_type" value="'.esc_attr($itype).'"><button class="button" title="اعمال موجودی حسابداری روی این کالا">اعمال موجودی</button></form>';
+                echo '<div class="nv-issue"><span class="nm">'.esc_html($ttl).'</span><span style="display:flex;gap:6px;align-items:center;flex-wrap:wrap"><span class="nv-badge grn">حسابداری: '.esc_html(number_format_i18n((float)$it['a'])).'</span><span class="nv-badge red">سایت: '.esc_html($wv).'</span>'.$form.'</span></div>';
             }
         } else {
             echo '<div class="nv-issue"><span class="nm" style="color:#94a3b8">همهٔ کالاهای نمونه هماهنگ‌اند یا موجودی حسابداری ندارند.</span></div>';

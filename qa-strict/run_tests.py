@@ -47,8 +47,8 @@ if hasattr(_t, 'tzset'):
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 PLUGIN = os.path.join(ROOT, 'novin-commerce')
-ZIP_PATH = os.path.join(ROOT, 'NovinCommerce-1.10.13.zip')
-VERSION = '1.10.13'
+ZIP_PATH = os.path.join(ROOT, 'NovinCommerce-1.10.14.zip')
+VERSION = '1.10.14'
 
 RESULTS = []
 FAILED = []
@@ -936,7 +936,7 @@ def test_group_composer_version_zip():
         and ("protected $version = '" + VERSION + "';") in file_text('lib/Plugin.php') \
         and ('**نسخه:** ' + VERSION) in readme \
         and ('## ' + VERSION) in changelog \
-        and ('1.10.13-dash13') in DASH
+        and ('1.10.14-dash14') in DASH
     check('T092', ok92, 'version ' + VERSION + ' consistent in header/class/README/CHANGELOG/cache-buster')
 
     if not os.path.exists(ZIP_PATH):
@@ -965,8 +965,8 @@ def test_group_composer_version_zip():
         zd = zf.read('novin-commerce/lib/Admin/Connection_Dashboard.php').decode('utf-8')
         zhas_js = 'novin-commerce/dist/scripts/admin/dashboard.js' in znames
         check('T095', 'render_latest_exchanges' in zd and 'webprd_detail_rows' in zd
-              and 'render_catalog_summary' in zd and zhas_js,
-              'dashboard helpers + animated catalog-summary JS shipped inside zip')
+              and 'render_catalog_summary' in zd and 'apply_accounting_stock' in zd and zhas_js,
+              'dashboard helpers + catalog-summary JS + stock-apply shipped inside zip')
 
         zrc = zf.read('novin-commerce/lib/Common/Novin_REST_Controller.php').decode('utf-8')
         check('T096', "'synced', 'success', $item_type, $item_id" in zrc, 'REST deleteSync log shipped in zip')
