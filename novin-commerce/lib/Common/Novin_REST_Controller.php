@@ -800,8 +800,15 @@ class Novin_REST_Controller extends \WC_REST_CRUD_Controller {
 		if ( ! $sync_item ) {
 			return new \WP_Error( 404, 'Sync Item not founds' );
 		}
+		$item_id   = (int) $sync_item->item_id;
+		$item_type = (string) $sync_item->item_type;
 		if ( $sync_item->delete() ) {
 			Sync::doDeleteAction();
+			// Record the completed exchange so the dashboard "activity" and
+			// "latest exchanges" panels reflect what the accounting software
+			// actually pulled, not only WordPress-side queue changes.
+			\MobinDev\Novin_Commerce\Common\SyncLog::add( 'synced', 'success', $item_type, $item_id, 'مورد توسط نرم‌افزار حسابداری دریافت شد.' );
+			Sync::flushHealthCache();
 
 			return new \WP_REST_Response( 'Sync Item deleted successfully.' );
 		}

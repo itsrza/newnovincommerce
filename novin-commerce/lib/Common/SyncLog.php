@@ -8,7 +8,7 @@ class SyncLog {
         $allowed = [ 'info', 'success', 'warning', 'error' ];
         $status = in_array( $status, $allowed, true ) ? $status : 'info';
         $context_json = ! empty( $context ) ? wp_json_encode( $context, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES ) : null;
-        return $wpdb->insert(
+        $inserted = $wpdb->insert(
             $table,
             [
                 'event_type' => sanitize_key( $event ),
@@ -21,6 +21,13 @@ class SyncLog {
             ],
             [ '%s', '%s', '%s', '%d', '%s', '%s', '%s' ]
         );
+        if ( $inserted && class_exists( '\MobinDev\Novin_Commerce\Models\Sync' ) ) {
+            // Keep dashboard activity snapshots fresh: any new event (successful
+            // exchange, queued item, removal, priority change, …) must be visible
+            // on the next dashboard render instead of a stale cached snapshot.
+            \MobinDev\Novin_Commerce\Models\Sync::flushHealthCache();
+        }
+        return $inserted;
     }
 
     public static function recent( $limit = 10 ) {

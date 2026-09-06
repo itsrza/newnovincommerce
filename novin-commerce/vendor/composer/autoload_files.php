@@ -12,5 +12,4 @@ return array(
     'a1105708a18b76903365ca1c4aa61b02' => $vendorDir . '/symfony/translation/Resources/functions.php',
     'a4ecaeafb8cfb009ad0e052c90355e98' => $vendorDir . '/beberlei/assert/lib/Assert/functions.php',
     '07b3d30d480da9938a58cfd5ad5e2cff' => $vendorDir . '/as247/wp-eloquent/src/Support/helpers.php',
-    'e4e590a9b5afe940db71ee1662c02677' => $vendorDir . '/morilog/jalali/src/helpers.php',
 );

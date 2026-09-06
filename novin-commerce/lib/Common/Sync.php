@@ -74,6 +74,9 @@ class Sync {
 	 */
 	public function productAddOrUpdate( $post_ID, $post, $update ) {
 		SyncModel::insertProduct( $post_ID );
+		// Accounting data always wins: write stock/price/variable structure
+		// from the WebPrd meta onto the product automatically.
+		WebPrd_Applier::maybe( $post_ID );
 	}
 
 	/**
@@ -82,6 +85,7 @@ class Sync {
 	 */
 	public function productUpdate( $product_id, $product ) {
 		SyncModel::insertProduct( $product_id );
+		WebPrd_Applier::maybe( $product_id );
 	}
 
 	/*** Order ***/
@@ -124,6 +128,7 @@ class Sync {
 	 */
 	public function variationAddOrUpdate( $post_ID, $post, $update ) {
 		SyncModel::insertVariation( $post_ID );
+		WebPrd_Applier::maybe( $post_ID );
 	}
 
 	/**
@@ -132,6 +137,7 @@ class Sync {
 	 */
 	public function variationUpdate( $variation_id, $variation ) {
 		SyncModel::insertVariation( $variation_id );
+		WebPrd_Applier::maybe( $variation_id );
 	}
 
 	/*** user ***/

@@ -1,3 +1,48 @@
+## 1.10.15
+- **همگام‌سازی خودکار (بدون تأیید مدیر):** دادهٔ حسابداری همیشه اولویت است. کلاس جدید `lib/Common/WebPrd_Applier.php` هنگام به‌روزرسانی هر کالا (و در یک مرور دوره‌ای ۶ ساعته از داشبورد) به‌صورت خودکار اعمال می‌کند:
+  - موجودی = جمع `Amount` در `PrdAnbarRelation` (حسابداری همیشه برنده است) → `stock_quantity`/`stock_status` ووکامرس.
+  - قیمت کالاهای ساده = `Sell1` (+ تخفیف در بازهٔ فعال `DiscountPercent`).
+  - **ساختار متغیر:** اگر WebPrd شامل `AttributeRelations`/`DefaultVariable` با چند فرزند باشد، کالای ساده به متغیر تبدیل می‌شود؛ ویژگی سراسری (pa_*) و مقادیر آن ساخته/پیوند می‌شود؛ فرزندانی که GUIDشان در سایت موجود است به‌عنوان متغیر به کالای اصلی لینک می‌شوند (با ویژگی و قیمت خودشان).
+  - هر اعمال در لاگ با رویدادهای auto_stock / auto_price / auto_structure / auto_variation ثبت می‌شود.
+- **بازطراحی کامل داشبورد:** بخش‌های قدیمی/ناقص حذف شدند (کارت‌های وضعیت، تصویر کلی فروشگاه، صف تبادل، وضعیت فعالیت، آخرین موارد تبادل، آخرین رویدادها، وضعیت انتشار کالاها، بررسی وضعیت تبادل، وضعیت فنی، ابزارها، جزئیات کالا). داشبورد حالا فقط شامل: سربرگ، «خلاصهٔ کاتالوگ — حسابداری × ووکامرس» (گرافیک متحرک) و «گزارش همگام‌سازی خودکار» است. دکمه‌های «اعمال موجودی» (که تأیید می‌خواستند) حذف شدند.
+
+## 1.10.14## 1.10.14
+- **اعمال موجودی از JSON به کالا (رفع مشکل «موجودی در JSON هست ولی روی سایت آپدیت نمی‌شود»):**
+  - دکمهٔ «اعمال موجودی» برای هر کالای دارای اختلاف در پنل «خلاصهٔ کاتالوگ» + دکمهٔ یک‌جا «اعمال موجودی حسابداری روی همهٔ موارد».
+  - مقدار از خود WebPrd خوانده می‌شود: جمع `Amount` داخل `PrdAnbarRelation` (مثلاً `Amount:7.0` برای کالای 16212 و `Amount:8.0` برای 16218) و با `wc_update_product_stock` در `stock_quantity`/`stock_status` ووکامرس نوشته می‌شود.
+  - عملیات با nonce و سطح دسترسی محافظت شده و رویداد `stock_sync` در لاگ ثبت می‌شود؛ کش داشبورد پس از اعمال پاک می‌شود تا اعداد فوراً به‌روز شوند.
+
+## 1.10.13## 1.10.13
+- داشبورد: افزودن پنل «خلاصهٔ کاتالوگ — حسابداری × ووکامرس» با گرافیک و انیمیشن (شمارندهٔ متحرک، دونات، نوارهای متحرک):
+  - تراشه‌های آماری متحرک: کل کاتالوگ، دارای WebPrd، JSON نامعتبر، بدون GUID، موجودی هماهنگ، اختلاف موجودی.
+  - **هماهنگی موجودی:** مقایسهٔ موجودی حسابداری (جمع `Amount` در `PrdAnbarRelation` — در JSON زنده مثلاً `Amount:7.0`) با stock ووکامرس (`_stock`/stock_quantity)؛ دسته‌های «هماهنگ / در سایت ثبت‌نشده / اختلاف عدد / نامشخص» + فهرست ۸ نمونهٔ دارای اختلاف با عدد هر دو سمت.
+  - **تازگی Sync:** سطل‌های زمانی بر اساس متای `_np-api-sync-date` (کمتر از ۲۴ ساعت / ۱-۷ روز / ۸-۳۰ روز / بیشتر / بدون تاریخ).
+  - **فعالیت ۷ روز اخیر:** نمودار میله‌ای ایجادی/ویرایشی بر اساس `date_created_gmt` و `date_modified_gmt` ووکامرس.
+- فایل انیمیشن جدا: `dist/scripts/admin/dashboard.js` (بدون وابستگی).
+- 100/100 تست سخت‌گیرانه همچنان موفق.
+
+## 1.10.12## 1.10.12
+- **رفع نصب/به‌روزرسانی:** زیپ انتشار دوباره با ساختار صحیح ساخته شد — همهٔ فایل‌های افزونه داخل پوشهٔ `novin-commerce/` هستند تا وردپرس هنگام «بارگذاری افزونه» همان افزونهٔ قبلی را به‌روزرسانی کند و یک کپی دوم/غیرقابل‌فعال‌سازی نسازد (مشکل نسخهٔ 1.10.11).
+- وضعیت فعالیت: متریک «خطا» حالا بر اساس دادهٔ WebPrd کالاها محاسبه می‌شود — کالایی نیازمند بررسی است که GUID داخل JSON آن با سایت ناخوانا/نامطابق باشد یا Modified حسابداری از تاریخ آخرین Sync قدیمی‌تر باشد؛ شمارش هر کالا فقط یک بار (بدون دوبار‌شماری) و نمایش «همگام‌شده و سالم» در کنار آن. رویدادهای ۲۴ ساعت اخیر همچنان در نمودار همان پنل نمایش داده می‌شوند.
+- آخرین موارد تبادل: رویدادهای «حذف از صف» (removed) دیگر زیر عنوان «دریافت‌شده توسط حسابداری» نمایش داده نمی‌شوند؛ حالا سه گروه جدا: «در انتظار در صف»، «دریافت‌شده توسط حسابداری» (فقط رویداد synced) و «حذف‌شده از صف — به حسابداری ارسال نشده».
+- به‌روزرسانی ابزار ۱۰۰ تست سخت‌گیرانه: افزودن بررسی ساختار پوشهٔ ریشه در زیپ (تا مشکل 1.10.11 دوباره رخ ندهد) و هماهنگ‌سازی تست‌های SQL پنل‌ها با گروه‌بندی جدید. — 100/100 موفق.
+
+## 1.10.11
+- داشبورد «مرکز کنترل تبادل» بازبینی و اصلاح شد:
+  - صف تبادل: شمارش هر نوع از همان کوئری تجمیعی health خوانده می‌شود (حذف ۶ کوئری تکراری Eloquent)؛ نمایش پیام مناسب وقتی صف خالی است؛ آمار هر لحظه با فیلتر کش.
+  - وضعیت فعالیت: سطل «اطلاع» (info) اضافه شد تا مجموع نوار و متریک‌ها با «مجموع ۲۴ ساعت» همیشه برابر باشد؛ زمان آخرین فعالیت هم زیر نمودار نمایش داده می‌شود.
+  - آخرین موارد تبادل: حالا هم موارد در انتظار صف را نشان می‌دهد و هم تبادل‌هایی که نرم‌افزار حسابداری دریافت کرده (رویداد synced)؛ نام کالا/فاکتور/دسته/شخص از ووکامرس وردپرس واکشی می‌شود و زمان‌ها به منطقه زمانی سایت تبدیل می‌شود.
+  - آخرین رویدادها: برچسب کامل همه رویدادها (queued/requeue/synced/removed/priority/disconnect/sync_datetime)، نمایش زمان سازگار و خروجی کاملاً escaped.
+- رفع به‌روز نبودن کش داشبورد: `Sync::flushHealthCache()` هر سه نسل transient (v1/v2/v3) را پاک می‌کند و در همهٔ نقاط تغییر صف/رویداد (queueItem، removeItem، setPriority، SyncLog::add، DELETE سینک، requeue) صدا زده می‌شود.
+- ثبت رویداد «synced» موقع دریافت مورد صف توسط نرم‌افزار حسابداری (DELETE /wc/v3/novin/syncs/{id}) تا فعالیت واقعی تبادل در داشبورد دیده شود.
+- بهره‌گیری گسترده از JSON محصول (متای WebPrd): جزئیات کالا شامل Code/IdProduct/Name/Sku/GroupName/VahedName/Sell1/Sell8/KardexPrice/BuyLast/Mojodi/درصد و بازه تخفیف/Prices/PriceRoleList/PrdBarcode/PrdTechnicalList/ImageListData/Files و... و کاشی‌های جدید (بارکد مقداردار، قیمت فروش Sell1، تخفیف زمان‌دار فعال، مشخصات فنی) در داشبورد.
+- افزودن ابزار تست سخت‌گیرانه `qa-strict/run_tests.py` (۱۰۰ تست: سازگاری PHP 7.4 تا 8.4، اجرای SQL پنل‌ها روی دیتابیس شبیه‌سازی‌شده، قرارداد JSON محصول، امنیت و یکپارچگی بسته).
+
+## 1.10.10
+- Fixed `PHP Fatal error: Cannot redeclare jdate()` which happened on sites whose theme or another plugin also declares a global `jdate()` function (e.g. themes shipping their own `jdf.php`). Root cause: the bundled `morilog/jalali` package registered its global helper `src/helpers.php` in Composer's eager `files` autoload, so the plugin's `vendor/autoload.php` executed it on every request before the theme even loaded — and its `jdate()` declaration then collided with the theme's.
+- The plugin never calls the global `jdate()` helper — it only uses the namespaced `Morilog\Jalali\Jalalian` class — so `src/helpers.php` has been removed from the Composer `files` autoload (autoload_static.php / autoload_files.php / installed.json / composer.lock / the package's own composer.json). Nothing is lost: `Jalalian` remains PSR-4 autoloaded and lazy-loaded as before, and the plugin no longer injects any global function that can clash with themes/plugins.
+- Maintainers: a plain `composer install` / `composer dump-autoload` keeps this fix (lock + installed.json are consistent). Only a `composer update` would re-pull upstream's `files` entry — if you ever run one, re-apply this change or the package will need a patched fork.
+
 ## 1.10.9
 - Reverted the 1.10.7 attempt to fix the /wc/v3/novin/version PHP-notice-leak issue. That fix (opening an output buffer at plugin-load time, plus a rest_pre_serve_request cleanup filter clearing all open output buffers) was confirmed by the site owner to actually break the endpoint on fadak-gostar.com — reverting to the pre-1.10.7 behaviour (going back to the plain 1.6.1-era code, `return $this->plugin->get_version();`) was confirmed working. getVersion() and the REST/AJAX wiring around it are back to that simple, known-good shape. The underlying PHP-notice-leak (from an unrelated plugin on that site, "company-comment-reaction") is not fixed by us — it was never actually caused by this plugin, and any real fix belongs in WP_DEBUG_DISPLAY configuration on that site or in the other plugin.
 
