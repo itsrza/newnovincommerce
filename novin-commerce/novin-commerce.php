@@ -16,7 +16,7 @@
  * Plugin Name:       Novin Commerce
  * Plugin URI:        https://npwp.ir/
  * Description:       Connect novin accounting app to woocommerce.
- * Version:           1.10.9
+ * Version:           1.10.10
  * Requires PHP:      7.4
  * Requires at least: 6.1
  * Requires Plugins:  woocommerce
