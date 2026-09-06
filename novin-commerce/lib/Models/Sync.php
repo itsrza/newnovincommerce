@@ -12,6 +12,19 @@ class Sync extends Model {
 	public static function doAddAction() { do_action( 'novincommerce-add-sync-items' ); }
 	public static function doDeleteAction() { do_action( 'novincommerce-delete-sync-items' ); }
 
+	/**
+	 * Invalidate every cached snapshot of the connection dashboard.
+	 *
+	 * Older releases cached only under "v1"/"v2" while the dashboard has been
+	 * reading a "v3" transient for a long time, so queue/activity changes
+	 * could stay hidden on the dashboard until the transient expired.
+	 */
+	public static function flushHealthCache() {
+		delete_transient( 'novin_commerce_health_v1' );
+		delete_transient( 'novin_commerce_health_v2' );
+		delete_transient( 'novin_commerce_health_v3' );
+	}
+
 	public static function queueItem( $item_id, $item_type, $priority = 0 ) {
 		$item_id = absint( $item_id );
 		$item_type = sanitize_key( $item_type );
@@ -23,8 +36,7 @@ class Sync extends Model {
 		$result = self::updateOrInsert( [ 'item_id' => $item_id, 'item_type' => $item_type ], [ 'priority' => $priority ] );
 		self::where( 'item_id', $item_id )->where( 'item_type', $item_type )->update( [ 'priority' => $priority ] );
 		SyncLog::add( $priority > 0 ? 'requeue' : 'queued', 'success', $item_type, $item_id, $priority > 0 ? 'مورد با اولویت بالا در صف تبادل قرار گرفت.' : 'مورد در صف تبادل قرار گرفت.', [ 'priority' => $priority ] );
-		delete_transient( 'novin_commerce_health_v1' );
-		delete_transient( 'novin_commerce_health_v2' );
+		self::flushHealthCache();
 		self::doAddAction();
 		return $result;
 	}
@@ -34,7 +46,10 @@ class Sync extends Model {
 	public static function setPriority( $item_id, $item_type, $priority ) {
 		$priority = max( 0, min( 100, (int) $priority ) );
 		$result = self::where( 'item_id', absint( $item_id ) )->where( 'item_type', sanitize_key( $item_type ) )->update( [ 'priority' => $priority ] );
-		if ( $result ) SyncLog::add( 'priority', 'success', $item_type, $item_id, 'اولویت صف تغییر کرد.', [ 'priority' => $priority ] );
+		if ( $result ) {
+			SyncLog::add( 'priority', 'success', $item_type, $item_id, 'اولویت صف تغییر کرد.', [ 'priority' => $priority ] );
+			self::flushHealthCache();
+		}
 		return $result;
 	}
 	public static function insertProduct( $item_id ) { return self::insertItem( $item_id, 'product' ); }
@@ -50,8 +65,7 @@ class Sync extends Model {
 		$result = self::where( 'item_id', $item_id )->where( 'item_type', $item_type )->delete();
 		if ( $result ) {
 			SyncLog::add( 'removed', 'success', $item_type, $item_id, 'مورد از صف تبادل حذف شد.' );
-			delete_transient( 'novin_commerce_health_v1' );
-			delete_transient( 'novin_commerce_health_v2' );
+			self::flushHealthCache();
 			self::doDeleteAction();
 		}
 		return $result;

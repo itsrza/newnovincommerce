@@ -1,3 +1,14 @@
+## 1.10.11
+- داشبورد «مرکز کنترل تبادل» بازبینی و اصلاح شد:
+  - صف تبادل: شمارش هر نوع از همان کوئری تجمیعی health خوانده می‌شود (حذف ۶ کوئری تکراری Eloquent)؛ نمایش پیام مناسب وقتی صف خالی است؛ آمار هر لحظه با فیلتر کش.
+  - وضعیت فعالیت: سطل «اطلاع» (info) اضافه شد تا مجموع نوار و متریک‌ها با «مجموع ۲۴ ساعت» همیشه برابر باشد؛ زمان آخرین فعالیت هم زیر نمودار نمایش داده می‌شود.
+  - آخرین موارد تبادل: حالا هم موارد در انتظار صف را نشان می‌دهد و هم تبادل‌هایی که نرم‌افزار حسابداری دریافت کرده (رویداد synced)؛ نام کالا/فاکتور/دسته/شخص از ووکامرس وردپرس واکشی می‌شود و زمان‌ها به منطقه زمانی سایت تبدیل می‌شود.
+  - آخرین رویدادها: برچسب کامل همه رویدادها (queued/requeue/synced/removed/priority/disconnect/sync_datetime)، نمایش زمان سازگار و خروجی کاملاً escaped.
+- رفع به‌روز نبودن کش داشبورد: `Sync::flushHealthCache()` هر سه نسل transient (v1/v2/v3) را پاک می‌کند و در همهٔ نقاط تغییر صف/رویداد (queueItem، removeItem، setPriority، SyncLog::add، DELETE سینک، requeue) صدا زده می‌شود.
+- ثبت رویداد «synced» موقع دریافت مورد صف توسط نرم‌افزار حسابداری (DELETE /wc/v3/novin/syncs/{id}) تا فعالیت واقعی تبادل در داشبورد دیده شود.
+- بهره‌گیری گسترده از JSON محصول (متای WebPrd): جزئیات کالا شامل Code/IdProduct/Name/Sku/GroupName/VahedName/Sell1/Sell8/KardexPrice/BuyLast/Mojodi/درصد و بازه تخفیف/Prices/PriceRoleList/PrdBarcode/PrdTechnicalList/ImageListData/Files و... و کاشی‌های جدید (بارکد مقداردار، قیمت فروش Sell1، تخفیف زمان‌دار فعال، مشخصات فنی) در داشبورد.
+- افزودن ابزار تست سخت‌گیرانه `qa-strict/run_tests.py` (۱۰۰ تست: سازگاری PHP 7.4 تا 8.4، اجرای SQL پنل‌ها روی دیتابیس شبیه‌سازی‌شده، قرارداد JSON محصول، امنیت و یکپارچگی بسته).
+
 ## 1.10.10
 - Fixed `PHP Fatal error: Cannot redeclare jdate()` which happened on sites whose theme or another plugin also declares a global `jdate()` function (e.g. themes shipping their own `jdf.php`). Root cause: the bundled `morilog/jalali` package registered its global helper `src/helpers.php` in Composer's eager `files` autoload, so the plugin's `vendor/autoload.php` executed it on every request before the theme even loaded — and its `jdate()` declaration then collided with the theme's.
 - The plugin never calls the global `jdate()` helper — it only uses the namespaced `Morilog\Jalali\Jalalian` class — so `src/helpers.php` has been removed from the Composer `files` autoload (autoload_static.php / autoload_files.php / installed.json / composer.lock / the package's own composer.json). Nothing is lost: `Jalalian` remains PSR-4 autoloaded and lazy-loaded as before, and the plugin no longer injects any global function that can clash with themes/plugins.
