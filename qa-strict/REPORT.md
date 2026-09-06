@@ -1,4 +1,4 @@
-# Novin Commerce 1.10.12 — گزارش ۱۰۰ تست سخت‌گیرانه
+# Novin Commerce 1.10.13 — گزارش ۱۰۰ تست سخت‌گیرانه
 
 - تاریخ اجرا: 2026-09-06 (sandbox، منطقه UTC)
 - نتیجه: **100/100 تست موفق**
@@ -105,10 +105,10 @@ REST و رندر مرورگر ممکن نبود. همهٔ مسیرهای قاب�
 - [x] `T089` composer.json/lock/installed.json/morilog composer.json valid JSON
 - [x] `T090` jdate helpers.php absent from all composer files-autoload registrations
 - [x] `T091` Jalalian PSR-4 autoload entry intact
-- [x] `T092` version 1.10.12 consistent in header/class/README/CHANGELOG/cache-buster
+- [x] `T092` version 1.10.13 consistent in header/class/README/CHANGELOG/cache-buster
 - [x] `T093` release zip valid; entries under single novin-commerce/ root; versioned; jdate fix
 - [x] `T094` zip has no top-level strays or repository junk
-- [x] `T095` dashboard helpers shipped inside zip
+- [x] `T095` dashboard helpers + animated catalog-summary JS shipped inside zip
 - [x] `T096` REST deleteSync log shipped in zip
 - [x] `T097` cache-flush fixes shipped in zip
 - [x] `T098` every shipped PHP folder has an index.php silencer
