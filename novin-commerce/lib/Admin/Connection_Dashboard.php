@@ -9,12 +9,14 @@ class Connection_Dashboard {
     public static function render() {
         if ( ! current_user_can( 'manage_options' ) ) wp_die( esc_html__( 'دسترسی غیرمجاز.', 'novin-commerce' ) );
         $plugin_file = dirname( __DIR__, 2 ) . '/novin-commerce.php';
-        wp_enqueue_style( 'novin-commerce-admin-table', plugins_url( 'dist/styles/admin/table.min.css', $plugin_file ), [], '1.10.11-dashboard11' );
+        wp_enqueue_style( 'novin-commerce-admin-table', plugins_url( 'dist/styles/admin/table.min.css', $plugin_file ), [], '1.10.12-dashboard12' );
         wp_add_inline_style( 'novin-commerce-admin-table', self::critical_css() );
         $started = microtime( true );
         self::handle_actions();
         $health = self::health();
         $logs = SyncLog::recent( 12 );
+        // 'issues' exists since 1.10.12; tolerate a transient cached by an older build.
+        $wp_issues = isset( $health['webprd']['issues'] ) ? (int) $health['webprd']['issues'] : (int) ( $health['webprd']['stale'] ?? 0 ) + (int) ( $health['webprd']['guid_mismatch'] ?? 0 );
         $query_ms = round( ( microtime( true ) - $started ) * 1000, 1 );
         echo '<div class="wrap novin-dashboard">';
         echo '<header class="novin-hero"><div><span class="novin-kicker">NOVIN COMMERCE</span><h1>مرکز کنترل تبادل</h1><p>وضعیت تبادل اطلاعات و مواردی را که نیاز به بررسی دارند، یکجا ببینید.</p></div><div class="novin-hero-actions"><a class="button" href="'.esc_url(admin_url('admin.php?page=novin-commerce-products')).'">کالاها</a><a class="button" href="'.esc_url(admin_url('admin.php?page=novin-commerce-syncs')).'">صف تبادل</a><a class="button" href="'.esc_url(admin_url('admin.php?page=novin-commerce-settings')).'">تنظیمات</a><a class="button button-primary" href="'.esc_url(admin_url('admin.php?page=novin-commerce-dashboard')).'">بررسی دوباره</a></div></header>';
@@ -24,7 +26,7 @@ class Connection_Dashboard {
         self::card('کالاهای سایت', number_format_i18n($health['catalog']['products']), 'info', self::icon('box'), 'محصولات اصلی منتشرشده');
         self::card('Variationها', number_format_i18n($health['catalog']['variations']), 'purple', self::icon('layers'), 'Variationهای منتشرشده');
         self::card('بدون GUID', number_format_i18n($health['catalog']['missing_guid']), $health['catalog']['missing_guid'] ? 'warning':'success', self::icon('key'), 'کالاهایی که شناسه اتصال ندارند');
-        self::card('نیازمند بررسی', number_format_i18n($health['webprd']['stale'] + $health['webprd']['guid_mismatch']), ($health['webprd']['stale']+$health['webprd']['guid_mismatch'])?'warning':'success', self::icon('alert'), 'بر اساس نمونه آخر داده‌ها');
+        self::card('نیازمند بررسی', number_format_i18n($wp_issues), $wp_issues?'warning':'success', self::icon('alert'), 'GUID نامطابق یا تاریخ Sync قدیمی در WebPrd');
         self::card('رویدادهای اخیر', number_format_i18n($health['logs']['total']), $health['logs']['error'] ? 'error':'teal', self::icon('activity'), $health['logs']['error'] ? number_format_i18n($health['logs']['error']).' خطای ثبت‌شده' : 'بدون خطای ثبت‌شده');
         self::card('زمان بررسی', $query_ms.' ms', $query_ms < 500 ? 'success':'warning', self::icon('speed'), 'زمان تولید همین داشبورد');
         echo '</div>';
@@ -53,7 +55,7 @@ class Connection_Dashboard {
         }
         if(!$queue_all)echo '<div class="novin-empty">صف تبادل خالی است — با تغییر کالا، فاکتور یا شخص، مورد جدیدی در صف قرار می‌گیرد.</div>';
         echo '</section>';
-        echo '<section class="novin-panel"><div class="novin-panel-title"><div><h2>وضعیت فعالیت</h2><p>تعداد رویدادهای ثبت‌شده در ۲۴ ساعت اخیر.</p></div></div><div class="novin-mini-chart">';
+        echo '<section class="novin-panel"><div class="novin-panel-title"><div><h2>وضعیت فعالیت</h2><p>رویدادهای ۲۴ ساعت اخیر + کالاهای نیازمند بررسی (بر اساس GUID و تاریخ Sync داخل WebPrd).</p></div></div><div class="novin-mini-chart">';
         self::stacked_bars('رویدادهای ۲۴ ساعت اخیر', [
             ['label'=>'موفق','value'=>$health['logs']['success'],'class'=>'success'],
             ['label'=>'در انتظار','value'=>$health['logs']['warning'],'class'=>'warning'],
@@ -61,10 +63,13 @@ class Connection_Dashboard {
             ['label'=>'اطلاع','value'=>$health['logs']['info'],'class'=>'info'],
         ]);
         echo '<div class="novin-activity-summary">';
-        self::metric('مجموع ۲۴ ساعت', number_format_i18n($health['logs']['total']));
+        self::metric('مجموع رویداد ۲۴ ساعت', number_format_i18n($health['logs']['total']));
         self::metric('موفق', number_format_i18n($health['logs']['success']));
-        self::metric('خطا', number_format_i18n($health['logs']['error']));
-        echo '</div><div class="novin-activity-foot">'.($health['logs']['latest']!==''?esc_html('آخرین فعالیت: '.self::time_label($health['logs']['latest'])):esc_html('هنوز رویدادی ثبت نشده است.')).'</div></div></section>';
+        self::metric('نیازمند بررسی (WebPrd)', number_format_i18n($wp_issues));
+        echo '</div>';
+        $wp_ok = (int) $health['webprd']['valid'] - $wp_issues;
+        echo '<div class="novin-activity-catalog" style="margin-top:10px;padding:8px 10px;background:#f8fafc;border:1px solid #eef2f7;border-radius:10px;font-size:12px;color:#334155;line-height:1.9">از '.number_format_i18n((int)$health['webprd']['sample']).' کالای نمونه: <strong>'.number_format_i18n(max(0,$wp_ok)).'</strong> همگام‌شده و سالم · <strong>'.number_format_i18n($wp_issues).'</strong> نیازمند بررسی (GUID نامطابق با سایت، یا Modified در JSON قدیمی‌تر از آخرین Sync است).</div>';
+        echo '<div class="novin-activity-foot">'.($health['logs']['latest']!==''?esc_html('آخرین فعالیت: '.self::time_label($health['logs']['latest'])):esc_html('هنوز رویدادی ثبت نشده است.')).'</div></div></section>';
         echo '<section class="novin-panel"><div class="novin-panel-title"><div><h2>آخرین موارد تبادل</h2><p>آخرین موارد در صف و تبادل‌هایی که نرم‌افزار حسابداری دریافت کرده است.</p></div></div>';
         self::render_latest_exchanges();
         echo '</section></div>';
@@ -196,14 +201,17 @@ class Connection_Dashboard {
     }
 
     /**
-     * "آخرین موارد تبادل": rows still waiting in the queue, followed by the
-     * exchanges the accounting software already pulled (sync log events).
+     * "آخرین موارد تبادل": items still waiting in the queue, exchanges the
+     * accounting software already pulled ('synced' events), and — separately,
+     * so they are never mistaken for completed exchanges — items that were
+     * deleted from the queue without being sent ('removed' events).
      */
     private static function render_latest_exchanges() {
         global $wpdb;
         $prefix  = $wpdb->prefix;
         $pending = $wpdb->get_results( $wpdb->prepare( "SELECT item_id, item_type, priority, created_at FROM {$prefix}novin_commerce_syncs ORDER BY id DESC LIMIT %d", 4 ) );
-        $done    = $wpdb->get_results( $wpdb->prepare( "SELECT item_id, item_type, event_type, created_at FROM {$prefix}novin_commerce_sync_logs WHERE event_type IN ('synced','removed') ORDER BY id DESC LIMIT %d", 4 ) );
+        $received = $wpdb->get_results( $wpdb->prepare( "SELECT item_id, item_type, event_type, created_at FROM {$prefix}novin_commerce_sync_logs WHERE event_type='synced' ORDER BY id DESC LIMIT %d", 4 ) );
+        $removed = $wpdb->get_results( $wpdb->prepare( "SELECT item_id, item_type, event_type, created_at FROM {$prefix}novin_commerce_sync_logs WHERE event_type='removed' ORDER BY id DESC LIMIT %d", 2 ) );
         $labels  = [ 'product' => 'کالا', 'variation' => 'Variation', 'order' => 'فاکتور', 'category' => 'دسته‌بندی', 'user' => 'شخص' ];
         $count   = 0;
         if ( $pending ) {
@@ -215,12 +223,19 @@ class Connection_Dashboard {
                 $count++;
             }
         }
-        if ( $done ) {
+        if ( $received ) {
             echo '<div class="novin-exchange-group">دریافت‌شده توسط حسابداری</div>';
-            foreach ( $done as $r ) {
+            foreach ( $received as $r ) {
                 $type = isset( $labels[ $r->item_type ] ) ? $labels[ $r->item_type ] : (string) $r->item_type;
-                $badge = 'synced' === $r->event_type ? 'دریافت شد' : 'حذف شد';
-                echo self::exchange_row_html( self::item_title( $r->item_type, $r->item_id ), $type, self::time_label( $r->created_at ), $badge );
+                echo self::exchange_row_html( self::item_title( $r->item_type, $r->item_id ), $type, self::time_label( $r->created_at ), 'دریافت شد' );
+                $count++;
+            }
+        }
+        if ( $removed ) {
+            echo '<div class="novin-exchange-group">حذف‌شده از صف (به حسابداری ارسال نشده)</div>';
+            foreach ( $removed as $r ) {
+                $type = isset( $labels[ $r->item_type ] ) ? $labels[ $r->item_type ] : (string) $r->item_type;
+                echo self::exchange_row_html( self::item_title( $r->item_type, $r->item_id ), $type, self::time_label( $r->created_at ), 'حذف از صف' );
                 $count++;
             }
         }
@@ -279,16 +294,17 @@ class Connection_Dashboard {
         $total=$products+$vars; $with=(int)$wpdb->get_var("SELECT COUNT(DISTINCT p.ID) FROM {$wpdb->posts} p INNER JOIN {$wpdb->postmeta} m ON m.post_id=p.ID AND m.meta_key='guid' AND m.meta_value<>'' WHERE p.post_type IN ('product','product_variation') AND p.post_status='publish'");
         $missing=max(0,$total-$with);
         $rows=$wpdb->get_results("SELECT p.ID,g.meta_value guid,w.meta_value webprd,s.meta_value sync_date FROM {$wpdb->posts} p LEFT JOIN {$wpdb->postmeta} g ON g.post_id=p.ID AND g.meta_key='guid' LEFT JOIN {$wpdb->postmeta} w ON w.post_id=p.ID AND w.meta_key='WebPrd' LEFT JOIN {$wpdb->postmeta} s ON s.post_id=p.ID AND s.meta_key='_np-api-sync-date' WHERE p.post_type IN ('product','product_variation') AND p.post_status='publish' AND w.meta_value<>'' ORDER BY p.ID DESC LIMIT 150");
-        $valid=$gm=$stale=0; $now=time();
+        $valid=$gm=$stale=$issues=0; $now=time();
         $webprd_insights=['modified'=>0,'stock_positive'=>0,'sku'=>0,'barcode'=>0,'barcode_value'=>0,'sell_price'=>0,'discount_active'=>0,'price_roles'=>0,'group'=>0,'vahed'=>0,'technical'=>0,'pics'=>0];
         foreach($rows as $r){
             $d=json_decode((string)$r->webprd,true,12);
             if(!is_array($d)||JSON_ERROR_NONE!==json_last_error())continue;
-            $valid++;
-            if(!empty($d['Guid']) && (string)$d['Guid']!==(string)$r->guid)$gm++;
+            $valid++; $row_issue=false;
+            if(!empty($d['Guid']) && (string)$d['Guid']!==(string)$r->guid){$gm++;$row_issue=true;}
             $a=!empty($d['Modified'])?strtotime((string)$d['Modified']):0;
             $b=!empty($r->sync_date)?strtotime(str_replace('/','-',(string)$r->sync_date)):0;
-            if($a&&$b&&$a>$b+1)$stale++;
+            if($a&&$b&&$a>$b+1){$stale++;$row_issue=true;}
+            if($row_issue)$issues++;
             if(!empty($d['Modified']))$webprd_insights['modified']++;
             if(isset($d['Mojodi'])&&is_numeric($d['Mojodi'])&&(float)$d['Mojodi']>0)$webprd_insights['stock_positive']++;
             if(!empty($d['Sku']))$webprd_insights['sku']++;
@@ -316,7 +332,7 @@ class Connection_Dashboard {
         $log_rows=$wpdb->get_results($wpdb->prepare("SELECT status, COUNT(*) AS total FROM {$log_table} WHERE created_at >= %s GROUP BY status", gmdate('Y-m-d H:i:s',time()-DAY_IN_SECONDS)));
         foreach((array)$log_rows as $lr){$n=(int)$lr->total;$log_counts['total']+=$n;if(isset($log_counts[$lr->status]))$log_counts[$lr->status]=$n;}
         $log_counts['latest']=(string)$wpdb->get_var("SELECT created_at FROM {$log_table} ORDER BY id DESC LIMIT 1");
-        $h=['api'=>['label'=>($api&&wp_http_validate_url($api))?'پیکربندی شده':'نیازمند بررسی','status'=>($api&&wp_http_validate_url($api))?'success':'error','detail'=>$api?:'آدرس API تنظیم نشده است.'],'sync_time'=>['label'=>$sync?wp_date('Y-m-d H:i:s',$sync):'ثبت نشده','status'=>$sync?'success':'warning'],'queue'=>['all'=>$all,'counts'=>$queue_counts],'catalog'=>['products'=>$products,'variable'=>$variable,'variations'=>$vars,'draft'=>$draft,'private'=>$private,'with_guid'=>$with,'missing_guid'=>$missing],'webprd'=>['sample'=>count($rows),'valid'=>$valid,'guid_mismatch'=>$gm,'stale'=>$stale,'insights'=>$webprd_insights],'logs'=>$log_counts];
+        $h=['api'=>['label'=>($api&&wp_http_validate_url($api))?'پیکربندی شده':'نیازمند بررسی','status'=>($api&&wp_http_validate_url($api))?'success':'error','detail'=>$api?:'آدرس API تنظیم نشده است.'],'sync_time'=>['label'=>$sync?wp_date('Y-m-d H:i:s',$sync):'ثبت نشده','status'=>$sync?'success':'warning'],'queue'=>['all'=>$all,'counts'=>$queue_counts],'catalog'=>['products'=>$products,'variable'=>$variable,'variations'=>$vars,'draft'=>$draft,'private'=>$private,'with_guid'=>$with,'missing_guid'=>$missing],'webprd'=>['sample'=>count($rows),'valid'=>$valid,'guid_mismatch'=>$gm,'stale'=>$stale,'issues'=>$issues,'insights'=>$webprd_insights],'logs'=>$log_counts];
         set_transient('novin_commerce_health_v3',$h,60);return $h;
     }
 

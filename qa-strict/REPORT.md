@@ -1,4 +1,4 @@
-# Novin Commerce 1.10.11 — گزارش ۱۰۰ تست سخت‌گیرانه
+# Novin Commerce 1.10.12 — گزارش ۱۰۰ تست سخت‌گیرانه
 
 - تاریخ اجرا: 2026-09-06 (sandbox، منطقه UTC)
 - نتیجه: **100/100 تست موفق**
@@ -59,7 +59,7 @@ REST و رندر مرورگر ممکن نبود. همهٔ مسیرهای قاب�
 - [x] `T043` dashboard 24h activity buckets (live source) exclude the old log
 - [x] `T044` dashboard latest-activity query (live source)
 - [x] `T045` dashboard pending-exchanges query (live source) order/limit
-- [x] `T046` dashboard completed-exchanges query (live source) filters events
+- [x] `T046` dashboard received/removed queries (live source) split event types
 - [x] `T047` pipeline queue total == dashboard SQL total (5)
 - [x] `T048` pipeline per-type queue counts == dashboard SQL
 - [x] `T049` pipeline scans the dashboard sample rows: 5 rows, valid JSON=4
@@ -73,7 +73,7 @@ REST و رندر مرورگر ممکن نبود. همهٔ مسیرهای قاب�
 - [x] `T057` pipeline latest activity matches dashboard SQL
 - [x] `T058` exchange row title helpers use WooCommerce/WP APIs
 - [x] `T059` time rendering converts UTC to site timezone
-- [x] `T060` latest-exchanges renderer balanced and complete
+- [x] `T060` latest-exchanges renderer balanced, split by synced/removed
 - [x] `T061` live product WebPrd payload decodes to an object
 - [x] `T062` required WebPrd fields exist in the live payload
 - [x] `T063` Sku/Slug strings
@@ -105,9 +105,9 @@ REST و رندر مرورگر ممکن نبود. همهٔ مسیرهای قاب�
 - [x] `T089` composer.json/lock/installed.json/morilog composer.json valid JSON
 - [x] `T090` jdate helpers.php absent from all composer files-autoload registrations
 - [x] `T091` Jalalian PSR-4 autoload entry intact
-- [x] `T092` version 1.10.11 consistent in header/class/README/CHANGELOG/cache-buster
-- [x] `T093` release zip valid + versioned + carries jdate fix
-- [x] `T094` zip contains no repository junk
+- [x] `T092` version 1.10.12 consistent in header/class/README/CHANGELOG/cache-buster
+- [x] `T093` release zip valid; entries under single novin-commerce/ root; versioned; jdate fix
+- [x] `T094` zip has no top-level strays or repository junk
 - [x] `T095` dashboard helpers shipped inside zip
 - [x] `T096` REST deleteSync log shipped in zip
 - [x] `T097` cache-flush fixes shipped in zip

@@ -47,8 +47,8 @@ if hasattr(_t, 'tzset'):
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 PLUGIN = os.path.join(ROOT, 'novin-commerce')
-ZIP_PATH = os.path.join(ROOT, 'NovinCommerce-1.10.11.zip')
-VERSION = '1.10.11'
+ZIP_PATH = os.path.join(ROOT, 'NovinCommerce-1.10.12.zip')
+VERSION = '1.10.12'
 
 RESULTS = []
 FAILED = []
@@ -312,7 +312,8 @@ def dash_sql_named(name):
         'activity': r'SELECT status, COUNT\(\*\) AS total FROM \{\$log_table\} WHERE created_at >= %s GROUP BY status',
         'latest': r'SELECT created_at FROM \{\$log_table\} ORDER BY id DESC LIMIT 1',
         'pending': r'SELECT item_id, item_type, priority, created_at FROM \{\$prefix\}novin_commerce_syncs ORDER BY id DESC LIMIT %d',
-        'done': r"SELECT item_id, item_type, event_type, created_at FROM \{\$prefix\}novin_commerce_sync_logs WHERE event_type IN \('synced','removed'\) ORDER BY id DESC LIMIT %d",
+        'received': r"SELECT item_id, item_type, event_type, created_at FROM \{\$prefix\}novin_commerce_sync_logs WHERE event_type='synced' ORDER BY id DESC LIMIT %d",
+        'removed': r"SELECT item_id, item_type, event_type, created_at FROM \{\$prefix\}novin_commerce_sync_logs WHERE event_type='removed' ORDER BY id DESC LIMIT %d",
     }
     m = re.search(table[name], DASH, re.S)
     return m.group(0) if m else None
@@ -694,10 +695,12 @@ def test_group_dashboard():
     check('T045', pen is not None and [r[0] for r in pen] == [9001, 3001, 7001, 5002],
           'dashboard pending-exchanges query (live source) order/limit', str(pen and [r[0] for r in pen]))
 
-    done = dash_sql(con, dash_sql_named('done'), [4])
-    evs = [r[2] for r in done] if done is not None else []
-    check('T046', done is not None and evs == ['synced', 'removed'],
-          'dashboard completed-exchanges query (live source) filters events', str(evs))
+    recv = dash_sql(con, dash_sql_named('received'), [4])
+    rmv = dash_sql(con, dash_sql_named('removed'), [2])
+    evr = [r[2] for r in recv] if recv is not None else []
+    evm = [r[2] for r in rmv] if rmv is not None else []
+    check('T046', recv is not None and rmv is not None and evr == ['synced'] and evm == ['removed'],
+          'dashboard received/removed queries (live source) split event types', str((evr, evm)))
 
     pipe = php_health_pipeline(con, now_ts, since_str)
     sql_total = sum((r[1] for r in qrows), 0) if qrows is not None else -1
@@ -753,8 +756,11 @@ def test_group_dashboard():
 
     # render_latest_exchanges + helpers structural sanity
     ok60 = balanced(DASH)[0] and DASH.count('exchange_row_html') >= 3 \
-        and 'در انتظار در صف' in DASH and 'دریافت‌شده توسط حسابداری' in DASH
-    check('T060', ok60, 'latest-exchanges renderer balanced and complete')
+        and 'در انتظار در صف' in DASH and 'دریافت‌شده توسط حسابداری' in DASH \
+        and 'حذف‌شده از صف (به حسابداری ارسال نشده)' in DASH \
+        and "event_type='synced'" in DASH and "event_type='removed'" in DASH \
+        and 'نیازمند بررسی (WebPrd)' in DASH and "'issues'" in DASH
+    check('T060', ok60, 'latest-exchanges renderer balanced, split by synced/removed')
 
 
 def test_group_webprd():
@@ -929,8 +935,8 @@ def test_group_composer_version_zip():
         and ("protected $version = '" + VERSION + "';") in file_text('lib/Plugin.php') \
         and ('**نسخه:** ' + VERSION) in readme \
         and ('## ' + VERSION) in changelog \
-        and ('1.10.11-dashboard11') in DASH
-    check('T092', ok92, 'version 1.10.11 consistent in header/class/README/CHANGELOG/cache-buster')
+        and ('1.10.12-dashboard12') in DASH
+    check('T092', ok92, 'version ' + VERSION + ' consistent in header/class/README/CHANGELOG/cache-buster')
 
     if not os.path.exists(ZIP_PATH):
         check('T093', False, 'release zip exists at repository root')
@@ -942,24 +948,28 @@ def test_group_composer_version_zip():
         zf = zipfile.ZipFile(ZIP_PATH)
         badf = zf.testzip()
         znames = zf.namelist()
-        zh = zf.read('novin-commerce.php').decode('utf-8')
-        zaf = zf.read('vendor/composer/autoload_static.php').decode('utf-8')
-        ok93 = badf is None and ('Version:           ' + VERSION) in zh \
+        tops = sorted({n.split('/')[0] for n in znames})
+        zh = zf.read('novin-commerce/novin-commerce.php').decode('utf-8')
+        zaf = zf.read('novin-commerce/vendor/composer/autoload_static.php').decode('utf-8')
+        ok93 = badf is None and tops == ['novin-commerce'] \
+            and ('Version:           ' + VERSION) in zh \
             and 'morilog/jalali/src/helpers.php' not in zaf
-        check('T093', ok93, 'release zip valid + versioned + carries jdate fix', badf or 'ok')
+        check('T093', ok93, 'release zip valid; entries under single novin-commerce/ root; versioned; jdate fix',
+              'badf=%s tops=%s' % (badf, tops) or 'ok')
 
-        junk = [n for n in znames if '.git' in n or 'node_modules' in n or 'qa-strict' in n]
-        check('T094', not junk, 'zip contains no repository junk', '; '.join(junk[:5]) or 'ok')
+        junk = [n for n in znames if not n.startswith('novin-commerce/')
+                or '/.git/' in n or 'node_modules' in n or 'qa-strict' in n]
+        check('T094', not junk, 'zip has no top-level strays or repository junk', '; '.join(junk[:5]) or 'ok')
 
-        zd = zf.read('lib/Admin/Connection_Dashboard.php').decode('utf-8')
+        zd = zf.read('novin-commerce/lib/Admin/Connection_Dashboard.php').decode('utf-8')
         check('T095', 'render_latest_exchanges' in zd and 'webprd_detail_rows' in zd,
               'dashboard helpers shipped inside zip')
 
-        zrc = zf.read('lib/Common/Novin_REST_Controller.php').decode('utf-8')
+        zrc = zf.read('novin-commerce/lib/Common/Novin_REST_Controller.php').decode('utf-8')
         check('T096', "'synced', 'success', $item_type, $item_id" in zrc, 'REST deleteSync log shipped in zip')
 
-        zsync = zf.read('lib/Models/Sync.php').decode('utf-8')
-        zsl = zf.read('lib/Common/SyncLog.php').decode('utf-8')
+        zsync = zf.read('novin-commerce/lib/Models/Sync.php').decode('utf-8')
+        zsl = zf.read('novin-commerce/lib/Common/SyncLog.php').decode('utf-8')
         check('T097', 'flushHealthCache' in zsync and 'flushHealthCache' in zsl,
               'cache-flush fixes shipped in zip')
 
@@ -991,7 +1001,7 @@ def main():
     passed = total - len(FAILED)
 
     print('=' * 80)
-    print('Novin Commerce 1.10.11 strict QA — %d tests' % total)
+    print('Novin Commerce %s strict QA — %d tests' % (VERSION, total))
     print('=' * 80)
     for tid, ok, name, detail in RESULTS:
         print('%-5s %s  %s' % (tid, 'PASS' if ok else 'FAIL', name))
@@ -1002,7 +1012,7 @@ def main():
 
     report = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'REPORT.md')
     with open(report, 'w', encoding='utf-8') as f:
-        f.write('# Novin Commerce 1.10.11 — گزارش ۱۰۰ تست سخت‌گیرانه\n\n')
+        f.write('# Novin Commerce %s — گزارش ۱۰۰ تست سخت‌گیرانه\n\n' % VERSION)
         f.write('- تاریخ اجرا: 2026-09-06 (sandbox، منطقه UTC)\n')
         f.write('- نتیجه: **%d/100 تست موفق**\n\n' % passed)
         f.write('## محدودیت صادقانه\n\n')
