@@ -62,11 +62,14 @@ class Connection_Dashboard {
             ['label'=>'خطا','value'=>$health['logs']['error'],'class'=>'error'],
             ['label'=>'اطلاع','value'=>$health['logs']['info'],'class'=>'info'],
         ]);
+        $cat_new  = isset( $health['catalog']['new_24h'] ) ? (int) $health['catalog']['new_24h'] : 0;
+        $cat_sync = isset( $health['catalog']['synced_24h'] ) ? (int) $health['catalog']['synced_24h'] : 0;
         echo '<div class="novin-activity-summary">';
-        self::metric('مجموع رویداد ۲۴ ساعت', number_format_i18n($health['logs']['total']));
-        self::metric('موفق', number_format_i18n($health['logs']['success']));
+        self::metric('موفق (رویدادهای ۲۴ ساعت)', number_format_i18n($health['logs']['success']));
+        self::metric('کالاهای همگام‌شده در ۲۴ ساعت', number_format_i18n($cat_sync));
         self::metric('نیازمند بررسی (WebPrd)', number_format_i18n($wp_issues));
         echo '</div>';
+        echo '<div class="novin-activity-catalog" style="margin-top:6px;font-size:12px;color:#64748b;line-height:1.8">کالای تازه منتشرشده در ۲۴ ساعت: '.number_format_i18n($cat_new).' — این شمارش مستقیم از دیتای کالاهاست و به ثبت لاگ وابسته نیست.</div>';
         $wp_ok = (int) $health['webprd']['valid'] - $wp_issues;
         echo '<div class="novin-activity-catalog" style="margin-top:10px;padding:8px 10px;background:#f8fafc;border:1px solid #eef2f7;border-radius:10px;font-size:12px;color:#334155;line-height:1.9">از '.number_format_i18n((int)$health['webprd']['sample']).' کالای نمونه: <strong>'.number_format_i18n(max(0,$wp_ok)).'</strong> همگام‌شده و سالم · <strong>'.number_format_i18n($wp_issues).'</strong> نیازمند بررسی (GUID نامطابق با سایت، یا Modified در JSON قدیمی‌تر از آخرین Sync است).</div>';
         echo '<div class="novin-activity-foot">'.($health['logs']['latest']!==''?esc_html('آخرین فعالیت: '.self::time_label($health['logs']['latest'])):esc_html('هنوز رویدادی ثبت نشده است.')).'</div></div></section>';
@@ -324,6 +327,10 @@ class Connection_Dashboard {
             if(!empty($d['PrdTechnicalList'])&&is_array($d['PrdTechnicalList']))$webprd_insights['technical']++;
             if(!empty($d['ImageListData'])&&is_array($d['ImageListData']))$webprd_insights['pics']++;
         }
+        $cut24=gmdate('Y-m-d H:i:s',time()-DAY_IN_SECONDS);
+        $new_24=(int)$wpdb->get_var($wpdb->prepare("SELECT COUNT(*) FROM {$wpdb->posts} WHERE post_type IN ('product','product_variation') AND post_status='publish' AND post_date_gmt>=%s",$cut24));
+        $cut24_fa=str_replace('-','/',$cut24);
+        $synced_24=(int)$wpdb->get_var($wpdb->prepare("SELECT COUNT(DISTINCT m.post_id) FROM {$wpdb->postmeta} m WHERE m.meta_key='_np-api-sync-date' AND m.meta_value<>'' AND m.meta_value>=%s",$cut24_fa));
         $queue_counts=[]; $all=0;
         $queue_rows=$wpdb->get_results("SELECT item_type, COUNT(*) AS total FROM {$wpdb->prefix}novin_commerce_syncs GROUP BY item_type");
         foreach((array)$queue_rows as $qr){$n=(int)$qr->total;$all+=$n;$queue_counts[sanitize_key($qr->item_type)]=$n;}
@@ -332,7 +339,7 @@ class Connection_Dashboard {
         $log_rows=$wpdb->get_results($wpdb->prepare("SELECT status, COUNT(*) AS total FROM {$log_table} WHERE created_at >= %s GROUP BY status", gmdate('Y-m-d H:i:s',time()-DAY_IN_SECONDS)));
         foreach((array)$log_rows as $lr){$n=(int)$lr->total;$log_counts['total']+=$n;if(isset($log_counts[$lr->status]))$log_counts[$lr->status]=$n;}
         $log_counts['latest']=(string)$wpdb->get_var("SELECT created_at FROM {$log_table} ORDER BY id DESC LIMIT 1");
-        $h=['api'=>['label'=>($api&&wp_http_validate_url($api))?'پیکربندی شده':'نیازمند بررسی','status'=>($api&&wp_http_validate_url($api))?'success':'error','detail'=>$api?:'آدرس API تنظیم نشده است.'],'sync_time'=>['label'=>$sync?wp_date('Y-m-d H:i:s',$sync):'ثبت نشده','status'=>$sync?'success':'warning'],'queue'=>['all'=>$all,'counts'=>$queue_counts],'catalog'=>['products'=>$products,'variable'=>$variable,'variations'=>$vars,'draft'=>$draft,'private'=>$private,'with_guid'=>$with,'missing_guid'=>$missing],'webprd'=>['sample'=>count($rows),'valid'=>$valid,'guid_mismatch'=>$gm,'stale'=>$stale,'issues'=>$issues,'insights'=>$webprd_insights],'logs'=>$log_counts];
+        $h=['api'=>['label'=>($api&&wp_http_validate_url($api))?'پیکربندی شده':'نیازمند بررسی','status'=>($api&&wp_http_validate_url($api))?'success':'error','detail'=>$api?:'آدرس API تنظیم نشده است.'],'sync_time'=>['label'=>$sync?wp_date('Y-m-d H:i:s',$sync):'ثبت نشده','status'=>$sync?'success':'warning'],'queue'=>['all'=>$all,'counts'=>$queue_counts],'catalog'=>['products'=>$products,'variable'=>$variable,'variations'=>$vars,'draft'=>$draft,'private'=>$private,'with_guid'=>$with,'missing_guid'=>$missing,'new_24h'=>$new_24,'synced_24h'=>$synced_24],'webprd'=>['sample'=>count($rows),'valid'=>$valid,'guid_mismatch'=>$gm,'stale'=>$stale,'issues'=>$issues,'insights'=>$webprd_insights],'logs'=>$log_counts];
         set_transient('novin_commerce_health_v3',$h,60);return $h;
     }
 
