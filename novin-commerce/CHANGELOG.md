@@ -1,5 +1,7 @@
 ## 1.12.0
 - Gateway password fields now show the characters while the administrator is entering them and after the settings page is refreshed.
+- SMS gateway fields autosave on blur/change; other tabs save only with the main save button.
+- Settings tabs switch without a page refresh, so edits across tabs can be saved together.
 - Version bump.
 
 ## 1.11.0

@@ -54,19 +54,20 @@ class Digits_Setting_Menu {
 
 		$tab = isset( $_POST['novin_digits_tab'] ) ? sanitize_key( wp_unslash( $_POST['novin_digits_tab'] ) ) : 'general';
 
-		if ( 'general' === $tab ) {
-			$this->save_general_tab();
-		} elseif ( 'sms' === $tab ) {
-			$this->save_sms_tab();
-		} elseif ( 'woocommerce' === $tab ) {
-			$this->save_woocommerce_tab();
+		if ( in_array( $tab, [ 'general', 'sms', 'woocommerce', 'logs' ], true ) ) {
+			// All settings tabs are rendered in the same form. Save the complete
+			// form together so values entered on another tab are not lost.
+			$this->save_general_tab( false );
+			$this->save_sms_tab( false );
+			$this->save_woocommerce_tab( false );
+			\MobinDev\Novin_Commerce\Admin\AdminNotice::addSuccessDismissible( 'تنظیمات ذخیره شد.', 2 );
 		}
 
-		wp_safe_redirect( add_query_arg( 'tab', $tab, admin_url( 'admin.php?page=novin-commerce-digits' ) ) );
+		wp_safe_redirect( add_query_arg( 'tab', in_array( $tab, [ 'general', 'sms', 'woocommerce', 'logs' ], true ) ? $tab : 'general', admin_url( 'admin.php?page=novin-commerce-digits' ) ) );
 		exit;
 	}
 
-	private function save_general_tab() {
+	private function save_general_tab( $show_notice = true ) {
 		$module_enabled = isset( $_POST['digits_enabled'] ) ? 'on' : 'off';
 		Digits_Settings::set( 'enabled', $module_enabled );
 
@@ -101,10 +102,12 @@ class Digits_Setting_Menu {
 			Digits_Settings::set( 'register_redirect', esc_url_raw( wp_unslash( $_POST['register_redirect'] ) ) );
 		}
 
-		\MobinDev\Novin_Commerce\Admin\AdminNotice::addSuccessDismissible( 'تنظیمات عمومی ذخیره شد.', 2 );
+		if ( $show_notice ) {
+			\MobinDev\Novin_Commerce\Admin\AdminNotice::addSuccessDismissible( 'تنظیمات عمومی ذخیره شد.', 2 );
+		}
 	}
 
-	private function save_sms_tab() {
+	private function save_sms_tab( $show_notice = true ) {
 		if ( isset( $_POST['active_sms_gateway'] ) ) {
 				$slug = sanitize_key( wp_unslash( $_POST['active_sms_gateway'] ) );
 				if ( '' === $slug || Gateway_Registry::get( $slug ) ) {
@@ -145,10 +148,12 @@ class Digits_Setting_Menu {
 			}
 		}
 
-		\MobinDev\Novin_Commerce\Admin\AdminNotice::addSuccessDismissible( 'تنظیمات پیامک ذخیره شد.', 2 );
+		if ( $show_notice ) {
+			\MobinDev\Novin_Commerce\Admin\AdminNotice::addSuccessDismissible( 'تنظیمات پیامک ذخیره شد.', 2 );
+		}
 	}
 
-	private function save_woocommerce_tab() {
+	private function save_woocommerce_tab( $show_notice = true ) {
 		Digits_Settings::set( 'wc_autofill_checkout_phone', isset( $_POST['wc_autofill_checkout_phone'] ) ? 'on' : 'off' );
 		Digits_Settings::set( 'wc_guest_checkout_signup', isset( $_POST['wc_guest_checkout_signup'] ) ? 'on' : 'off' );
 
@@ -159,7 +164,9 @@ class Digits_Setting_Menu {
 			}
 		}
 
-		\MobinDev\Novin_Commerce\Admin\AdminNotice::addSuccessDismissible( 'تنظیمات ووکامرس ذخیره شد.', 2 );
+		if ( $show_notice ) {
+			\MobinDev\Novin_Commerce\Admin\AdminNotice::addSuccessDismissible( 'تنظیمات ووکامرس ذخیره شد.', 2 );
+		}
 	}
 
 	/**
@@ -354,6 +361,7 @@ class Digits_Setting_Menu {
 					.novin-digits-save-toast.is-visible{opacity:1;transform:translateY(0)}
 					.novin-digits-save-toast.is-error{background:#dc2626}
 					.novin-digits-saving{opacity:.65}
+					.novin-digits-tab-panel[hidden],form[data-settings-form="1"][hidden]{display:none!important}
 				</style>
 				<div id="novin-digits-save-toast" class="novin-digits-save-toast" role="status" aria-live="polite"></div>
 				<div class="novin-settings-header">
@@ -375,12 +383,11 @@ class Digits_Setting_Menu {
 					] as $tab => $label
 				) :
 					?>
-					<a class="nav-tab <?php echo $active === $tab ? 'nav-tab-active' : ''; ?>" href="<?php echo esc_url( add_query_arg( [ 'page' => 'novin-commerce-digits', 'tab' => $tab ], admin_url( 'admin.php' ) ) ); ?>"><?php echo esc_html( $label ); ?></a>
+						<a class="nav-tab <?php echo $active === $tab ? 'nav-tab-active' : ''; ?>" href="#novin-digits-tab-<?php echo esc_attr( $tab ); ?>" data-novin-tab="<?php echo esc_attr( $tab ); ?>"><?php echo esc_html( $label ); ?></a>
 				<?php endforeach; ?>
 			</nav>
 
-			<?php if ( 'logs' === $active ) : ?>
-				<div class="novin-settings-panel">
+				<div class="novin-settings-panel novin-digits-tab-panel" data-tab-panel="logs" <?php echo 'logs' === $active ? '' : 'hidden'; ?>>
 					<h2>گزارش ارسال پیامک</h2>
 					<?php $counts = Sms_Log::counts_since( 86400 ); ?>
 					<p class="description">در ۲۴ ساعت گذشته: <strong style="color:#16a34a"><?php echo esc_html( $counts['success'] ); ?> موفق</strong> — <strong style="color:#dc2626"><?php echo esc_html( $counts['error'] ); ?> ناموفق</strong></p>
@@ -407,13 +414,13 @@ class Digits_Setting_Menu {
 						</tbody>
 					</table>
 				</div>
-			<?php else : ?>
-					<form method="post" class="novin-settings-panel" data-autosave-nonce="<?php echo esc_attr( wp_create_nonce( 'novin-digits-autosave' ) ); ?>">
+
+					<form method="post" class="novin-settings-panel" data-settings-form="1" data-autosave-nonce="<?php echo esc_attr( wp_create_nonce( 'novin-digits-autosave' ) ); ?>" <?php echo 'logs' === $active ? 'hidden' : ''; ?>>
 						<?php wp_nonce_field( 'novin-digits-settings' ); ?>
 					<input type="hidden" name="novin_digits_settings_submit" value="1">
 					<input type="hidden" name="novin_digits_tab" value="<?php echo esc_attr( $active ); ?>">
 
-					<?php if ( 'general' === $active ) : ?>
+					<div class="novin-digits-tab-panel" data-tab-panel="general" <?php echo 'general' === $active ? '' : 'hidden'; ?>>
 						<h2>تنظیمات عمومی</h2>
 						<p class="description">فعال‌سازی ماژول، حالت ورود/ثبت‌نام و پارامترهای امنیتی کد تأیید.</p>
 						<table class="form-table" role="presentation">
@@ -470,7 +477,9 @@ class Digits_Setting_Menu {
 							</tr>
 						</table>
 
-					<?php elseif ( 'sms' === $active ) : ?>
+						</div>
+
+					<div class="novin-digits-tab-panel" data-tab-panel="sms" <?php echo 'sms' === $active ? '' : 'hidden'; ?>>
 						<h2>پیامک و درگاه</h2>
 						<p class="description">انتخاب سرویس‌دهنده پیامکی فعال و تنظیمات اختصاصی هر درگاه.</p>
 						<table class="form-table" role="presentation">
@@ -527,7 +536,9 @@ class Digits_Setting_Menu {
 							</div>
 						<?php endforeach; ?>
 
-					<?php elseif ( 'woocommerce' === $active ) : ?>
+						</div>
+
+					<div class="novin-digits-tab-panel" data-tab-panel="woocommerce" <?php echo 'woocommerce' === $active ? '' : 'hidden'; ?>>
 						<h2>یکپارچگی با ووکامرس</h2>
 						<table class="form-table" role="presentation">
 							<tr>
@@ -549,16 +560,49 @@ class Digits_Setting_Menu {
 								</td>
 							</tr>
 						</table>
-					<?php endif; ?>
+					</div>
 
-					<p class="submit"><button type="submit" class="button button-primary">ذخیره تغییرات</button></p>
-				</form>
-			<?php endif; ?>
-		</div>
+						<p class="submit"><button type="submit" class="button button-primary">ذخیره تغییرات</button></p>
+					</form>
+			</div>
 
-		<script>
-		(function(){
-			document.querySelectorAll('.novin-digits-test-sms').forEach(function(box){
+			<script>
+			(function(){
+				var tabs = document.querySelectorAll('[data-novin-tab]');
+				var panels = document.querySelectorAll('[data-tab-panel]');
+				var settingsForm = document.querySelector('form[data-settings-form="1"]');
+				var tabInput = settingsForm ? settingsForm.querySelector('input[name="novin_digits_tab"]') : null;
+				var allowedTabs = ['general', 'sms', 'woocommerce', 'logs'];
+
+				function setTab(tab, updateUrl) {
+					if (allowedTabs.indexOf(tab) === -1) tab = 'general';
+					tabs.forEach(function(link){
+						link.classList.toggle('nav-tab-active', link.getAttribute('data-novin-tab') === tab);
+					});
+					panels.forEach(function(panel){
+						panel.hidden = panel.getAttribute('data-tab-panel') !== tab;
+					});
+					if (settingsForm) settingsForm.hidden = 'logs' === tab;
+					if (tabInput) tabInput.value = tab;
+					if (updateUrl && window.history && window.history.replaceState) {
+						var url = new URL(window.location.href);
+						url.searchParams.set('tab', tab);
+						window.history.replaceState({}, document.title, url.toString());
+					}
+				}
+
+				tabs.forEach(function(link){
+					link.addEventListener('click', function(event){
+						event.preventDefault();
+						setTab(link.getAttribute('data-novin-tab'), true);
+					});
+				});
+
+				setTab(<?php echo wp_json_encode( $active ); ?>, false);
+			})();
+
+			(function(){
+				document.querySelectorAll('.novin-digits-test-sms').forEach(function(box){
 				var btn = box.querySelector('.novin-digits-test-btn');
 				var phoneInput = box.querySelector('.novin-digits-test-phone');
 				var resultEl = box.querySelector('.novin-digits-test-result');
@@ -628,13 +672,10 @@ class Digits_Setting_Menu {
 					function saveField(field) {
 						var form = field.form;
 						if (!form || !field.name || !form.getAttribute('data-autosave-nonce')) return;
-						var tabInput = form.querySelector('input[name="novin_digits_tab"]');
-					if (!tabInput) return;
-
-					var body = new URLSearchParams();
+						var body = new URLSearchParams();
 					body.append('action', 'novin_digits_autosave');
 					body.append('nonce', form.getAttribute('data-autosave-nonce'));
-					body.append('tab', tabInput.value);
+						body.append('tab', 'sms');
 					body.append('field', field.name);
 					body.append('value', fieldValue(field));
 
@@ -663,7 +704,9 @@ class Digits_Setting_Menu {
 				}
 
 				document.querySelectorAll('form.novin-settings-panel[data-autosave-nonce]').forEach(function(form){
-					form.querySelectorAll('input:not([type="hidden"]), select, textarea').forEach(function(field){
+						var smsPanel = form.querySelector('[data-tab-panel="sms"]');
+						if (!smsPanel) return;
+						smsPanel.querySelectorAll('input:not([type="hidden"]), select, textarea').forEach(function(field){
 							if ('1' === field.getAttribute('data-password-field')) {
 									field.addEventListener('focus', function(){
 										if ('1' === field.getAttribute('data-password-masked')) {
