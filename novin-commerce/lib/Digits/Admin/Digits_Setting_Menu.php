@@ -383,7 +383,7 @@ class Digits_Setting_Menu {
 					] as $tab => $label
 				) :
 					?>
-						<a class="nav-tab <?php echo $active === $tab ? 'nav-tab-active' : ''; ?>" href="#novin-digits-tab-<?php echo esc_attr( $tab ); ?>" data-novin-tab="<?php echo esc_attr( $tab ); ?>"><?php echo esc_html( $label ); ?></a>
+						<a class="nav-tab <?php echo $active === $tab ? 'nav-tab-active' : ''; ?>" href="<?php echo esc_url( add_query_arg( [ 'page' => 'novin-commerce-digits', 'tab' => $tab ], admin_url( 'admin.php' ) ) ); ?>" data-novin-tab="<?php echo esc_attr( $tab ); ?>"><?php echo esc_html( $label ); ?></a>
 				<?php endforeach; ?>
 			</nav>
 
