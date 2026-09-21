@@ -1,5 +1,5 @@
 ## 1.12.0
-- Gateway password fields now show the characters while the administrator is entering them, while saved values remain represented by a mask after refresh.
+- Gateway password fields now show the characters while the administrator is entering them and after the settings page is refreshed.
 - Version bump.
 
 ## 1.11.0

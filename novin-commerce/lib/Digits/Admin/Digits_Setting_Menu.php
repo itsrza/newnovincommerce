@@ -502,17 +502,16 @@ class Digits_Setting_Menu {
 								foreach ( $gateway->get_settings_fields() as $field ) :
 										$field_id  = 'gateway_' . $slug . '_' . $field['key'];
 										$value     = $gw_settings[ $field['key'] ] ?? $field['default'];
-											$has_stored_password = 'password' === $field['type'] && Digits_Settings::gateway_has_password( $slug );
-											$display_value = $has_stored_password ? self::PASSWORD_MASK : $value;
-											// The administrator explicitly needs to see what was typed
-											// while editing. A previously saved value is still shown
-											// only as a mask after a page refresh.
+											// This field is intentionally plain text: the administrator
+											// requested seeing the exact gateway password while entering
+											// it and after the settings page is refreshed.
+											$display_value = $value;
 											$input_type = 'text';
 									?>
 									<tr>
 										<th><label for="<?php echo esc_attr( $field_id ); ?>"><?php echo esc_html( $field['label'] ); ?></label></th>
 										<td>
-													<input class="regular-text" type="<?php echo esc_attr( $input_type ); ?>" id="<?php echo esc_attr( $field_id ); ?>" name="<?php echo esc_attr( $field_id ); ?>" value="<?php echo esc_attr( $display_value ); ?>" data-password-field="<?php echo 'password' === $field['type'] ? '1' : '0'; ?>" data-password-masked="<?php echo $has_stored_password ? '1' : '0'; ?>" autocomplete="off" placeholder="<?php echo 'password' === $field['type'] ? 'برای تغییر وارد کنید؛ برای حفظ مقدار فعلی خالی بگذارید' : ''; ?>">
+													<input class="regular-text" type="<?php echo esc_attr( $input_type ); ?>" id="<?php echo esc_attr( $field_id ); ?>" name="<?php echo esc_attr( $field_id ); ?>" value="<?php echo esc_attr( $display_value ); ?>" data-password-field="<?php echo 'password' === $field['type'] ? '1' : '0'; ?>" data-password-masked="0" autocomplete="off" placeholder="<?php echo 'password' === $field['type'] ? 'برای تغییر وارد کنید؛ برای حفظ مقدار فعلی خالی بگذارید' : ''; ?>">
 											<?php if ( ! empty( $field['description'] ) ) : ?>
 												<p class="description"><?php echo esc_html( $field['description'] ); ?></p>
 											<?php endif; ?>
@@ -593,13 +592,12 @@ class Digits_Setting_Menu {
 			});
 			})();
 
-			// Save each setting as soon as its field loses focus. A stored password
-			// is represented by a mask after refresh; while editing, the admin
-			// can see the characters currently being entered.
+			// Save each setting as soon as its field loses focus. The password
+			// field intentionally stays as plain text so the administrator can
+			// verify exactly what was entered.
 			(function(){
 				var toast = document.getElementById('novin-digits-save-toast');
 				var toastTimer = null;
-				var passwordMask = <?php echo wp_json_encode( self::PASSWORD_MASK ); ?>;
 
 				function showToast(message, isError) {
 					if (!toast) return;
@@ -651,13 +649,9 @@ class Digits_Setting_Menu {
 									return;
 								}
 								if ('1' === field.getAttribute('data-password-field') && response.data && response.data.password_stored) {
-									if (response.data.password_preserved) {
-										field.value = passwordMask;
-										field.dataset.novinAutosaveValue = passwordMask;
-										field.setAttribute('data-password-masked', '1');
-									} else {
-										field.setAttribute('data-password-masked', '0');
-									}
+									// Keep the exact text in the field after an autosave.
+									// The field is deliberately type=text by user request.
+									field.setAttribute('data-password-masked', '0');
 								}
 							showToast('ذخیره شد.', false);
 					})
