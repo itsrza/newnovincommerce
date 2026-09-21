@@ -1,3 +1,7 @@
+## 1.12.0
+- Gateway password fields now show the characters while the administrator is entering them, while saved values remain represented by a mask after refresh.
+- Version bump.
+
 ## 1.11.0
 - Added optional mobile-number OTP login and registration for WordPress and WooCommerce.
 - Added Digits settings, SMS gateway logging, NPSMS ASP.NET response handling, and secure gateway-password storage.

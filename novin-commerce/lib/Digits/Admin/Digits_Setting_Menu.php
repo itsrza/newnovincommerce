@@ -301,13 +301,19 @@ class Digits_Setting_Menu {
 				}
 
 				$settings = Digits_Settings::get_gateway_settings( $slug );
-				if ( 'password' === $field_definition['type'] && ( '' === trim( $value ) || self::PASSWORD_MASK === trim( $value ) ) ) {
-					return [ 'password_stored' => Digits_Settings::gateway_has_password( $slug ) ];
-				}
+					if ( 'password' === $field_definition['type'] && ( '' === trim( $value ) || self::PASSWORD_MASK === trim( $value ) ) ) {
+						return [
+							'password_stored'    => Digits_Settings::gateway_has_password( $slug ),
+							'password_preserved' => true,
+						];
+					}
 
-				$settings[ $field_key ] = sanitize_text_field( $value );
-				Digits_Settings::set_gateway_settings( $slug, $settings );
-				return [ 'password_stored' => 'password' === $field_definition['type'] ];
+					$settings[ $field_key ] = sanitize_text_field( $value );
+					Digits_Settings::set_gateway_settings( $slug, $settings );
+					return [
+						'password_stored'    => 'password' === $field_definition['type'],
+						'password_preserved' => false,
+					];
 			}
 
 			return new \WP_Error( 'invalid_field', 'فیلد پیامکی معتبر نیست.' );
@@ -498,10 +504,10 @@ class Digits_Setting_Menu {
 										$value     = $gw_settings[ $field['key'] ] ?? $field['default'];
 											$has_stored_password = 'password' === $field['type'] && Digits_Settings::gateway_has_password( $slug );
 											$display_value = $has_stored_password ? self::PASSWORD_MASK : $value;
-											// Use plain text only for the mask itself, never for the
-											// actual password. Focus switches it back to password
-											// input before the administrator can type.
-											$input_type = 'password' === $field['type'] ? ( $has_stored_password ? 'text' : 'password' ) : 'text';
+											// The administrator explicitly needs to see what was typed
+											// while editing. A previously saved value is still shown
+											// only as a mask after a page refresh.
+											$input_type = 'text';
 									?>
 									<tr>
 										<th><label for="<?php echo esc_attr( $field_id ); ?>"><?php echo esc_html( $field['label'] ); ?></label></th>
@@ -587,9 +593,9 @@ class Digits_Setting_Menu {
 			});
 			})();
 
-			// Save each setting as soon as its field loses focus. Passwords are
-			// never returned to the browser; a stored password is represented by
-			// a mask and cleared only when the admin focuses the field to replace it.
+			// Save each setting as soon as its field loses focus. A stored password
+			// is represented by a mask after refresh; while editing, the admin
+			// can see the characters currently being entered.
 			(function(){
 				var toast = document.getElementById('novin-digits-save-toast');
 				var toastTimer = null;
@@ -645,10 +651,13 @@ class Digits_Setting_Menu {
 									return;
 								}
 								if ('1' === field.getAttribute('data-password-field') && response.data && response.data.password_stored) {
-									field.value = passwordMask;
-									field.type = 'text';
-									field.dataset.novinAutosaveValue = passwordMask;
-									field.setAttribute('data-password-masked', '1');
+									if (response.data.password_preserved) {
+										field.value = passwordMask;
+										field.dataset.novinAutosaveValue = passwordMask;
+										field.setAttribute('data-password-masked', '1');
+									} else {
+										field.setAttribute('data-password-masked', '0');
+									}
 								}
 							showToast('ذخیره شد.', false);
 					})
@@ -662,13 +671,12 @@ class Digits_Setting_Menu {
 				document.querySelectorAll('form.novin-settings-panel[data-autosave-nonce]').forEach(function(form){
 					form.querySelectorAll('input:not([type="hidden"]), select, textarea').forEach(function(field){
 							if ('1' === field.getAttribute('data-password-field')) {
-								field.addEventListener('focus', function(){
-									if ('1' === field.getAttribute('data-password-masked')) {
-										field.value = '';
-										field.setAttribute('data-password-masked', '0');
-									}
-									if ('text' === field.type) field.type = 'password';
-								});
+									field.addEventListener('focus', function(){
+										if ('1' === field.getAttribute('data-password-masked')) {
+											field.value = '';
+											field.setAttribute('data-password-masked', '0');
+										}
+									});
 							}
 						field.addEventListener('change', function(){ autosaveField(field); });
 						field.addEventListener('blur', function(){ autosaveField(field); });
