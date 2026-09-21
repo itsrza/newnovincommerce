@@ -58,6 +58,22 @@ class Digits_Settings {
 	}
 
 	/**
+	 * Check whether a gateway has a saved password without returning the
+	 * password or attempting to expose it to the settings page.
+	 *
+	 * @param string $gateway_slug
+	 * @return bool
+	 */
+	public static function gateway_has_password( $gateway_slug ) {
+		$all_gateways = self::get( 'sms_gateways', [] );
+		return is_array( $all_gateways )
+			&& isset( $all_gateways[ $gateway_slug ] )
+			&& is_array( $all_gateways[ $gateway_slug ] )
+			&& isset( $all_gateways[ $gateway_slug ]['password'] )
+			&& '' !== trim( (string) $all_gateways[ $gateway_slug ]['password'] );
+	}
+
+	/**
 	 * Save one SMS gateway's settings sub-array, encrypting the password
 	 * field before it is persisted.
 	 *

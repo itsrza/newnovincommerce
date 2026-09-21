@@ -302,7 +302,7 @@ class Digits_Setting_Menu {
 
 				$settings = Digits_Settings::get_gateway_settings( $slug );
 				if ( 'password' === $field_definition['type'] && ( '' === trim( $value ) || self::PASSWORD_MASK === trim( $value ) ) ) {
-					return [ 'password_stored' => ! empty( $settings[ $field_key ] ) ];
+					return [ 'password_stored' => Digits_Settings::gateway_has_password( $slug ) ];
 				}
 
 				$settings[ $field_key ] = sanitize_text_field( $value );
@@ -496,14 +496,17 @@ class Digits_Setting_Menu {
 								foreach ( $gateway->get_settings_fields() as $field ) :
 										$field_id  = 'gateway_' . $slug . '_' . $field['key'];
 										$value     = $gw_settings[ $field['key'] ] ?? $field['default'];
-										$has_stored_password = 'password' === $field['type'] && '' !== trim( (string) ( $gw_settings[ $field['key'] ] ?? '' ) );
-										$display_value = $has_stored_password ? self::PASSWORD_MASK : $value;
-										$input_type = 'password' === $field['type'] ? 'password' : 'text';
+											$has_stored_password = 'password' === $field['type'] && Digits_Settings::gateway_has_password( $slug );
+											$display_value = $has_stored_password ? self::PASSWORD_MASK : $value;
+											// Use plain text only for the mask itself, never for the
+											// actual password. Focus switches it back to password
+											// input before the administrator can type.
+											$input_type = 'password' === $field['type'] ? ( $has_stored_password ? 'text' : 'password' ) : 'text';
 									?>
 									<tr>
 										<th><label for="<?php echo esc_attr( $field_id ); ?>"><?php echo esc_html( $field['label'] ); ?></label></th>
 										<td>
-												<input class="regular-text" type="<?php echo esc_attr( $input_type ); ?>" id="<?php echo esc_attr( $field_id ); ?>" name="<?php echo esc_attr( $field_id ); ?>" value="<?php echo esc_attr( $display_value ); ?>" data-password-masked="<?php echo $has_stored_password ? '1' : '0'; ?>" autocomplete="off" placeholder="<?php echo 'password' === $field['type'] ? 'برای تغییر وارد کنید؛ برای حفظ مقدار فعلی خالی بگذارید' : ''; ?>">
+													<input class="regular-text" type="<?php echo esc_attr( $input_type ); ?>" id="<?php echo esc_attr( $field_id ); ?>" name="<?php echo esc_attr( $field_id ); ?>" value="<?php echo esc_attr( $display_value ); ?>" data-password-field="<?php echo 'password' === $field['type'] ? '1' : '0'; ?>" data-password-masked="<?php echo $has_stored_password ? '1' : '0'; ?>" autocomplete="off" placeholder="<?php echo 'password' === $field['type'] ? 'برای تغییر وارد کنید؛ برای حفظ مقدار فعلی خالی بگذارید' : ''; ?>">
 											<?php if ( ! empty( $field['description'] ) ) : ?>
 												<p class="description"><?php echo esc_html( $field['description'] ); ?></p>
 											<?php endif; ?>
@@ -641,11 +644,12 @@ class Digits_Setting_Menu {
 									showToast(response && response.data && response.data.message ? response.data.message : 'ذخیره تنظیمات ناموفق بود.', true);
 									return;
 								}
-							if ('password' === field.type && response.data && response.data.password_stored) {
+								if ('1' === field.getAttribute('data-password-field') && response.data && response.data.password_stored) {
 									field.value = passwordMask;
+									field.type = 'text';
 									field.dataset.novinAutosaveValue = passwordMask;
 									field.setAttribute('data-password-masked', '1');
-							}
+								}
 							showToast('ذخیره شد.', false);
 					})
 							.catch(function(){
@@ -657,14 +661,15 @@ class Digits_Setting_Menu {
 
 				document.querySelectorAll('form.novin-settings-panel[data-autosave-nonce]').forEach(function(form){
 					form.querySelectorAll('input:not([type="hidden"]), select, textarea').forEach(function(field){
-						if ('password' === field.type) {
-							field.addEventListener('focus', function(){
-								if ('1' === field.getAttribute('data-password-masked')) {
-									field.value = '';
-									field.setAttribute('data-password-masked', '0');
-								}
-							});
-						}
+							if ('1' === field.getAttribute('data-password-field')) {
+								field.addEventListener('focus', function(){
+									if ('1' === field.getAttribute('data-password-masked')) {
+										field.value = '';
+										field.setAttribute('data-password-masked', '0');
+									}
+									if ('text' === field.type) field.type = 'password';
+								});
+							}
 						field.addEventListener('change', function(){ autosaveField(field); });
 						field.addEventListener('blur', function(){ autosaveField(field); });
 					});

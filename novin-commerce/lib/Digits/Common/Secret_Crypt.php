@@ -19,6 +19,8 @@ namespace MobinDev\Novin_Commerce\Digits\Common;
  */
 class Secret_Crypt {
 
+	const PREFIX = 'novin-aes-v1:';
+
 	private static function get_key() {
 		$key_material = ( defined( 'AUTH_KEY' ) ? AUTH_KEY : '' ) . ( defined( 'AUTH_SALT' ) ? AUTH_SALT : '' );
 		if ( '' === $key_material ) {
@@ -32,7 +34,7 @@ class Secret_Crypt {
 
 	/**
 	 * @param string $plain
-	 * @return string Base64-encoded ciphertext, or '' if input was empty.
+	 * @return string Marked Base64-encoded ciphertext, or '' if input was empty.
 	 */
 	public static function encrypt( $plain ) {
 		$plain = (string) $plain;
@@ -53,7 +55,7 @@ class Secret_Crypt {
 			return $plain;
 		}
 
-		return base64_encode( $iv . $encrypted ); // phpcs:ignore WordPress.PHP.DiscouragedPHPFunctions.obfuscation_base64_encode
+		return self::PREFIX . base64_encode( $iv . $encrypted ); // phpcs:ignore WordPress.PHP.DiscouragedPHPFunctions.obfuscation_base64_encode
 	}
 
 	/**
@@ -66,22 +68,28 @@ class Secret_Crypt {
 			return '';
 		}
 
+		$has_prefix = 0 === strpos( $stored, self::PREFIX );
+		$payload    = $has_prefix ? substr( $stored, strlen( self::PREFIX ) ) : $stored;
+
 		if ( ! function_exists( 'openssl_decrypt' ) ) {
-			return $stored;
+			return $has_prefix ? '' : $stored;
 		}
 
-		$raw = base64_decode( $stored, true ); // phpcs:ignore WordPress.PHP.DiscouragedPHPFunctions.obfuscation_base64_decode
+		$raw = base64_decode( $payload, true ); // phpcs:ignore WordPress.PHP.DiscouragedPHPFunctions.obfuscation_base64_decode
 		if ( false === $raw || strlen( $raw ) <= 16 ) {
-			// Not a value we encrypted (e.g. legacy plain-text value from
-			// before this feature existed) — return as-is so existing
-			// settings don't suddenly break.
-			return $stored;
+			// Values without the marker may be legacy plain-text passwords.
+			// Never turn those into an empty value merely because they happen
+			// to be an invalid Base64 string.
+			return $has_prefix ? '' : $stored;
 		}
 
 		$iv        = substr( $raw, 0, 16 );
 		$cipher    = substr( $raw, 16 );
 		$decrypted = openssl_decrypt( $cipher, 'aes-256-cbc', self::get_key(), OPENSSL_RAW_DATA, $iv );
 
-		return false === $decrypted ? '' : $decrypted;
+		// The unmarked format was used by the first implementation. Keep it
+		// readable for existing sites, while new values are explicitly marked
+		// so a legacy plain-text value can never be confused with ciphertext.
+		return false === $decrypted ? ( $has_prefix ? '' : $stored ) : $decrypted;
 	}
 }
