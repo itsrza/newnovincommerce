@@ -1,0 +1,144 @@
+.novin-digits-auth {
+    width: 100%;
+    max-width: 460px;
+    margin: 18px auto;
+    color: #1f2937;
+    direction: rtl;
+}
+
+.novin-digits-auth-card {
+    box-sizing: border-box;
+    padding: 24px;
+    background: #fff;
+    border: 1px solid #e5e7eb;
+    border-radius: 14px;
+    box-shadow: 0 8px 24px rgba(15, 23, 42, .06);
+}
+
+.novin-digits-auth-card h2 {
+    margin: 0 0 8px;
+    color: #111827;
+    font-size: 21px;
+    line-height: 1.5;
+}
+
+.novin-digits-auth-description {
+    margin: 0 0 20px;
+    color: #64748b;
+    font-size: 13px;
+    line-height: 1.9;
+}
+
+.novin-digits-auth-form {
+    display: grid;
+    gap: 12px;
+}
+
+.novin-digits-auth-form label {
+    display: block;
+    margin: 0 0 6px;
+    color: #334155;
+    font-size: 13px;
+    font-weight: 600;
+}
+
+.novin-digits-auth-form input[type="tel"],
+.novin-digits-auth-form input[type="text"],
+.novin-digits-auth-form input[type="password"] {
+    box-sizing: border-box;
+    display: block;
+    width: 100%;
+    min-height: 44px;
+    margin: 0 0 13px;
+    padding: 8px 12px;
+    border: 1px solid #cbd5e1;
+    border-radius: 8px;
+    background: #fff;
+    color: #0f172a;
+    font-size: 15px;
+}
+
+.novin-digits-auth-form input:focus {
+    border-color: #2563eb;
+    outline: 2px solid rgba(37, 99, 235, .16);
+    outline-offset: 1px;
+}
+
+.novin-digits-auth-form button {
+    min-height: 42px;
+    margin-top: 2px;
+    cursor: pointer;
+}
+
+.novin-digits-auth-form button:disabled {
+    cursor: wait;
+    opacity: .65;
+}
+
+.novin-digits-auth-form .novin-digits-resend-button {
+    display: inline-block;
+    min-height: 30px;
+    padding: 0;
+    border: 0;
+    background: transparent;
+    color: #2563eb;
+    font-size: 12px;
+}
+
+.novin-digits-auth-form .novin-digits-resend-button:disabled {
+    color: #94a3b8;
+    cursor: default;
+}
+
+.novin-digits-countdown {
+    display: block;
+    min-height: 20px;
+    color: #64748b;
+    font-size: 12px;
+}
+
+.novin-digits-auth-message {
+    min-height: 22px;
+    margin-top: 3px;
+    font-size: 13px;
+    line-height: 1.8;
+}
+
+.novin-digits-auth-message.is-success {
+    color: #15803d;
+}
+
+.novin-digits-auth-message.is-error {
+    color: #b91c1c;
+}
+
+.novin-digits-auth noscript {
+    display: block;
+    margin-top: 12px;
+    color: #b91c1c;
+    font-size: 12px;
+}
+
+/* wp-login.php renders its original form after login_message. The mobile
+ * form is the only visible form while the module is enabled. */
+body.novin-digits-login-active #loginform,
+body.novin-digits-login-active #registerform,
+body.novin-digits-login-active #nav,
+body.novin-digits-login-active #backtoblog {
+    display: none !important;
+}
+
+body.novin-digits-login-active #login {
+    width: min(92%, 460px);
+}
+
+body.novin-digits-login-active .novin-digits-auth {
+    margin-top: 0;
+}
+
+@media (max-width: 480px) {
+    .novin-digits-auth-card {
+        padding: 18px;
+        border-radius: 10px;
+    }
+}

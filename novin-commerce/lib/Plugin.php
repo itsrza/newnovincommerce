@@ -19,6 +19,7 @@ use As247\WpEloquent\Application;
 use MobinDev\Novin_Commerce\Admin\AdminNotice;
 use MobinDev\Novin_Commerce\Admin\Menu;
 use MobinDev\Novin_Commerce\Common\Woocommerce;
+use MobinDev\Novin_Commerce\Digits\Digits_Module;
 use MobinDev\Novin_Commerce\Frontend\Shortcode;
 use MobinDev\Novin_Commerce\Frontend\Woocommerce_Menu;
 
@@ -64,7 +65,7 @@ class Plugin {
 	 * @access   protected
 	 * @var      string $version The current version of the plugin.
 	 */
-	protected $version = '1.10.9';
+	protected $version = '1.11.0';
 
 	/**
 	 * Define the core functionality of the plugin.
@@ -153,6 +154,7 @@ class Plugin {
 		$this->set_locale();
 		$this->define_admin_hooks();
 		$this->define_frontend_hooks();
+		Digits_Module::boot( $this );
 		$this->loader->run();
 	}
 
