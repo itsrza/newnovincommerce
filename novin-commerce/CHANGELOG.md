@@ -1,3 +1,8 @@
+## 1.11.0
+- Added optional mobile-number OTP login and registration for WordPress and WooCommerce.
+- Added Digits settings, SMS gateway logging, NPSMS ASP.NET response handling, and secure gateway-password storage.
+- Added per-field settings autosave with a saved confirmation toast.
+
 ## 1.10.9
 - Reverted the 1.10.7 attempt to fix the /wc/v3/novin/version PHP-notice-leak issue. That fix (opening an output buffer at plugin-load time, plus a rest_pre_serve_request cleanup filter clearing all open output buffers) was confirmed by the site owner to actually break the endpoint on fadak-gostar.com — reverting to the pre-1.10.7 behaviour (going back to the plain 1.6.1-era code, `return $this->plugin->get_version();`) was confirmed working. getVersion() and the REST/AJAX wiring around it are back to that simple, known-good shape. The underlying PHP-notice-leak (from an unrelated plugin on that site, "company-comment-reaction") is not fixed by us — it was never actually caused by this plugin, and any real fix belongs in WP_DEBUG_DISPLAY configuration on that site or in the other plugin.
 

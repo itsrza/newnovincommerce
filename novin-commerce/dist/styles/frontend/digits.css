@@ -1,0 +1,130 @@
+.novin-digits-auth {
+	box-sizing: border-box;
+	width: 100%;
+	max-width: 460px;
+	margin: 24px auto;
+	font-size: 15px;
+	line-height: 1.7;
+	text-align: right;
+}
+
+.novin-digits-auth,
+.novin-digits-auth * {
+	box-sizing: border-box;
+}
+
+.novin-digits-auth-card {
+	padding: 26px;
+	border: 1px solid #e2e8f0;
+	border-radius: 12px;
+	background: #fff;
+	box-shadow: 0 8px 28px rgba(15, 23, 42, .08);
+}
+
+.novin-digits-auth h2 {
+	margin: 0 0 8px;
+	color: #0f172a;
+	font-size: 22px;
+	line-height: 1.4;
+}
+
+.novin-digits-auth-description {
+	margin: 0 0 20px;
+	color: #64748b;
+}
+
+.novin-digits-auth label {
+	display: block;
+	margin: 0 0 6px;
+	color: #334155;
+	font-weight: 600;
+}
+
+.novin-digits-auth input {
+	display: block;
+	width: 100%;
+	min-height: 44px;
+	margin: 0 0 14px;
+	padding: 8px 12px;
+	border: 1px solid #cbd5e1;
+	border-radius: 7px;
+	background: #fff;
+	color: #0f172a;
+	font-size: 16px;
+	line-height: 1.4;
+}
+
+.novin-digits-auth input:focus {
+	border-color: #2563eb;
+	box-shadow: 0 0 0 2px rgba(37, 99, 235, .15);
+	outline: none;
+}
+
+.novin-digits-auth button {
+	min-height: 42px;
+	cursor: pointer;
+}
+
+.novin-digits-auth button[disabled] {
+	cursor: not-allowed;
+	opacity: .65;
+}
+
+.novin-digits-request-button,
+.novin-digits-verify-button {
+	width: 100%;
+	margin-top: 4px;
+}
+
+.novin-digits-resend-button {
+	margin-top: 14px;
+	padding: 0;
+	border: 0;
+	background: transparent;
+	color: #2563eb;
+}
+
+.novin-digits-countdown {
+	display: block;
+	margin-top: 8px;
+	color: #64748b;
+	font-size: 13px;
+}
+
+.novin-digits-auth-message {
+	min-height: 24px;
+	margin-top: 16px;
+	color: #16a34a;
+}
+
+.novin-digits-auth-message.is-error {
+	color: #dc2626;
+}
+
+.novin-digits-auth-message.is-success {
+	color: #16a34a;
+}
+
+/* On wp-login.php the normal forms are still rendered by WordPress. The
+ * class added by Mobile_Auth scopes these rules to the intended login and
+ * registration actions, leaving password recovery and other actions intact. */
+.novin-digits-login-active #loginform,
+.novin-digits-login-active #registerform {
+	display: none !important;
+}
+
+.novin-digits-login-active #nav,
+.novin-digits-login-active #backtoblog {
+	display: none !important;
+}
+
+.novin-digits-login-active .novin-digits-auth {
+	max-width: 320px;
+	margin-top: 0;
+}
+
+@media (max-width: 480px) {
+	.novin-digits-auth-card {
+		padding: 20px;
+	}
+}
