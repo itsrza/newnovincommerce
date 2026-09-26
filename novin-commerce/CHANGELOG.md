@@ -1,3 +1,6 @@
+## 1.13.0
+- افزایش نسخه به‌دلیل اصلاحات قیمت‌گذاری نقش‌ها و ذخیره تنظیمات.
+
 ## 1.12.0
 - Gateway password fields now show the characters while the administrator is entering them and after the settings page is refreshed.
 - SMS gateway fields autosave on blur/change; other tabs save only with the main save button.

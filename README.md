@@ -4,7 +4,7 @@
 
 ### پل ارتباطی رسمی بین نرم‌افزار حسابداری نوین‌پرداز و فروشگاه اینترنتی ووکامرس
 
-**نسخه:** 1.12.0 | **زبان:** فارسی | **پلتفرم:** وردپرس + ووکامرس
+**نسخه:** 1.13.0 | **زبان:** فارسی | **پلتفرم:** وردپرس + ووکامرس
 
 [![Requires PHP](https://img.shields.io/badge/PHP-7.4%2B-777BB4?style=flat-square&logo=php)](https://php.net)
 [![Requires WordPress](https://img.shields.io/badge/WordPress-6.1%2B-21759B?style=flat-square&logo=wordpress)](https://wordpress.org)
