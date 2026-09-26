@@ -11,10 +11,32 @@ class Setting_Menu {
 
     public function save() {
         if ( isset( $_POST['novin_save_admin_access'] ) && class_exists( 'NovinCommerce_RolePrice_Settings' ) ) {
-            $instance = \NovinCommerce_RolePrice_Settings::get_instance();
-            if ( $instance ) { $instance->save(); }
-            return;
+            if ( ! isset( $_POST['_wpnonce'] ) || ! wp_verify_nonce( sanitize_text_field( wp_unslash( $_POST['_wpnonce'] ) ), 'novin-role-access' ) ) {
+                return;
+            }
+            \NovinCommerce_RolePrice_Settings::save_admin_access(
+                isset( $_POST['novin_admin_access'] ) ? wp_unslash( $_POST['novin_admin_access'] ) : array()
+            );
+            AdminNotice::addSuccessDismissible( 'دسترسی‌ها با موفقیت ذخیره شد.', 2 );
+            wp_safe_redirect( add_query_arg( array( 'page' => 'novin-commerce-settings', 'tab' => 'roles' ), admin_url( 'admin.php' ) ) );
+            exit;
         }
+
+        // A no-JavaScript fallback for the embedded role form. The normal
+        // path is AJAX, but a failed script must never turn a settings save
+        // into a blank/unstyled admin response.
+        if ( isset( $_POST['wcpbr_roles_form'] ) && class_exists( 'NovinCommerce_RolePrice_Settings' ) ) {
+            if ( isset( $_POST['wcpbr_roles_nonce'] ) && wp_verify_nonce( sanitize_text_field( wp_unslash( $_POST['wcpbr_roles_nonce'] ) ), 'wcpbr_save_roles_form' ) ) {
+                $instance = \NovinCommerce_RolePrice_Settings::get_instance();
+                if ( $instance ) {
+                    $instance->save_roles_from_post( isset( $_POST['roles'] ) ? wp_unslash( $_POST['roles'] ) : array() );
+                }
+                AdminNotice::addSuccessDismissible( 'تنظیمات نقش‌ها با موفقیت ذخیره شد.', 2 );
+            }
+            wp_safe_redirect( add_query_arg( array( 'page' => 'novin-commerce-settings', 'tab' => 'roles' ), admin_url( 'admin.php' ) ) );
+            exit;
+        }
+
         if ( ! isset( $_POST['novin_settings_submit'] ) ) return;
         check_admin_referer( 'novin-settings' );
 

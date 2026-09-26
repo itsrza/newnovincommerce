@@ -87,13 +87,13 @@ return array_key_exists( $role, NovinCommerce_RolePrice_Roles::get_roles() );
 private function get_role_regular_raw( $post_id, $role ) {
 $post_id = absint( $post_id );
 if ( ! $post_id || ! $this->is_known_role( $role ) ) return '';
-return get_post_meta( $post_id, NovinCommerce_RolePrice_Roles::regular_meta_key( $role ), true );
+return NovinCommerce_RolePrice_Roles::get_compatible_role_price( $post_id, $role, 'regular' );
 }
 
 private function get_role_sale_raw( $post_id, $role ) {
 $post_id = absint( $post_id );
 if ( ! $post_id || ! $this->is_known_role( $role ) ) return '';
-return get_post_meta( $post_id, NovinCommerce_RolePrice_Roles::sale_meta_key( $role ), true );
+return NovinCommerce_RolePrice_Roles::get_compatible_role_price( $post_id, $role, 'sale' );
 }
 
 private function is_valid_price( $raw ) {

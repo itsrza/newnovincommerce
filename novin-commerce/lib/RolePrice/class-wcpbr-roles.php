@@ -5,7 +5,9 @@ if ( ! defined( 'ABSPATH' ) ) {
 
 class NovinCommerce_RolePrice_Roles {
 
-	const OPTION_KEY = 'wcpbr_roles_config';
+	const OPTION_KEY          = 'wcpbr_roles_config';
+	const FESTI_META_KEY      = 'festiUserRolePrices';
+	const FESTI_SALE_KEY      = 'salePrice';
 
 	private static function default_config() {
 		return array(
@@ -96,10 +98,226 @@ class NovinCommerce_RolePrice_Roles {
 	}
 
 	public static function regular_meta_key( $role ) {
-		return '_wcpbr_regular_price_' . $role;
+		return '_wcpbr_regular_price_' . sanitize_key( $role );
 	}
 
 	public static function sale_meta_key( $role ) {
-		return '_wcpbr_sale_price_' . $role;
+		return '_wcpbr_sale_price_' . sanitize_key( $role );
+	}
+
+	/**
+	 * Decode the JSON used by the legacy WooCommerce Prices By User Role plugin.
+	 *
+	 * The legacy plugin stores this value as JSON (WordPress returns it as a
+	 * string), while a few installations have an array/serialized value.  Keep
+	 * both formats readable so migrating the price engine cannot discard data.
+	 */
+	public static function get_festi_role_prices( $post_id ) {
+		$post_id = absint( $post_id );
+		if ( ! $post_id ) {
+			return array();
+		}
+
+		$raw = get_post_meta( $post_id, self::FESTI_META_KEY, true );
+		return self::decode_price_data( $raw );
+	}
+
+	private static function decode_price_data( $raw ) {
+		if ( is_array( $raw ) ) {
+			return $raw;
+		}
+
+		if ( is_object( $raw ) ) {
+			$raw = json_decode( wp_json_encode( $raw ), true );
+			return is_array( $raw ) ? $raw : array();
+		}
+
+		if ( ! is_string( $raw ) || '' === trim( $raw ) ) {
+			return array();
+		}
+
+		$decoded = json_decode( $raw, true );
+		if ( JSON_ERROR_NONE === json_last_error() && is_array( $decoded ) ) {
+			return $decoded;
+		}
+
+		// Some export tools add WordPress-style escaping around the JSON.
+		$decoded = json_decode( stripslashes( $raw ), true );
+		if ( JSON_ERROR_NONE === json_last_error() && is_array( $decoded ) ) {
+			return $decoded;
+		}
+
+		if ( function_exists( 'maybe_unserialize' ) ) {
+			$decoded = maybe_unserialize( $raw );
+			if ( is_array( $decoded ) ) {
+				return $decoded;
+			}
+		}
+
+		return array();
+	}
+
+	private static function non_empty_price( $value ) {
+		if ( is_array( $value ) || is_object( $value ) || null === $value ) {
+			return false;
+		}
+
+		return '' !== trim( (string) $value );
+	}
+
+	/**
+	 * Read a role price from festiUserRolePrices.
+	 *
+	 * Regular prices are stored under the role key itself.  Sale prices are
+	 * stored under salePrice[role], with schedule and other legacy keys kept
+	 * untouched.
+	 */
+	public static function get_festi_role_price( $post_id, $role, $type = 'regular' ) {
+		$data     = self::get_festi_role_prices( $post_id );
+		$role_key = sanitize_key( $role );
+		if ( '' === $role_key || empty( $data ) ) {
+			return '';
+		}
+
+		if ( 'sale' === $type ) {
+			$sale_raw   = isset( $data[ self::FESTI_SALE_KEY ] ) ? $data[ self::FESTI_SALE_KEY ] : array();
+			$sale_prices = self::decode_price_data( $sale_raw );
+			if ( isset( $sale_prices[ $role_key ] ) && self::non_empty_price( $sale_prices[ $role_key ] ) ) {
+				return $sale_prices[ $role_key ];
+			}
+			foreach ( $sale_prices as $key => $value ) {
+				if ( $role_key === sanitize_key( $key ) && self::non_empty_price( $value ) ) {
+					return $value;
+				}
+			}
+			// Older exports occasionally used a scalar salePrice. It is a
+			// common sale value, so it is safe to use as a fallback for the
+			// role while retaining the normal per-role structure on write.
+			if ( self::non_empty_price( $sale_raw ) ) {
+				return $sale_raw;
+			}
+			return '';
+		}
+
+		if ( isset( $data[ $role_key ] ) && self::non_empty_price( $data[ $role_key ] ) ) {
+			return $data[ $role_key ];
+		}
+
+		foreach ( $data as $key => $value ) {
+			if ( self::FESTI_SALE_KEY === $key || $role_key !== sanitize_key( $key ) ) {
+				continue;
+			}
+			if ( self::non_empty_price( $value ) ) {
+				return $value;
+			}
+		}
+
+		return '';
+	}
+
+	/**
+	 * Return a compatible role price from the canonical meta, Festi's JSON,
+	 * or the common Alg/WooCommerce role-price meta names.
+	 */
+	public static function get_compatible_role_price( $post_id, $role, $type = 'regular' ) {
+		$post_id  = absint( $post_id );
+		$role_key = sanitize_key( $role );
+		if ( ! $post_id || '' === $role_key ) {
+			return '';
+		}
+
+		$canonical_key = 'sale' === $type ? self::sale_meta_key( $role_key ) : self::regular_meta_key( $role_key );
+		$canonical     = get_post_meta( $post_id, $canonical_key, true );
+		if ( self::non_empty_price( $canonical ) ) {
+			return $canonical;
+		}
+
+		$festi = self::get_festi_role_price( $post_id, $role_key, $type );
+		if ( self::non_empty_price( $festi ) ) {
+			return $festi;
+		}
+
+		// Keep existing installations using the other popular role-price
+		// plugin readable.  The new canonical keys remain our write target.
+		$all_meta = get_post_meta( $post_id );
+		if ( ! is_array( $all_meta ) ) {
+			return '';
+		}
+
+		$wanted = 'sale' === $type ? 'sale' : 'regular';
+		foreach ( $all_meta as $meta_key => $values ) {
+			$meta_key = (string) $meta_key;
+			$matched  = false;
+			$meta_role = '';
+
+			if ( preg_match( '/^_alg_wc_price_(?:badminiy_)?user_role_(regular|sale)_price_(.+)$/', $meta_key, $matches ) ) {
+				$matched   = true;
+				$meta_type = $matches[1];
+				$meta_role = sanitize_key( $matches[2] );
+			} elseif ( preg_match( '/^_alg_wc_price_(?:badminiy_)?user_role_(.+)_(regular|sale)_price$/', $meta_key, $matches ) ) {
+				$matched   = true;
+				$meta_type = $matches[2];
+				$meta_role = sanitize_key( $matches[1] );
+			}
+
+			if ( ! $matched || $meta_type !== $wanted || $meta_role !== $role_key || ! is_array( $values ) ) {
+				continue;
+			}
+
+			foreach ( $values as $value ) {
+				if ( self::non_empty_price( $value ) ) {
+					return $value;
+				}
+			}
+		}
+
+		return '';
+	}
+
+	/**
+	 * Update the compatible Festi JSON without dropping schedule/unknown keys.
+	 * $prices is role => array( 'regular' => ..., 'sale' => ... ).
+	 */
+	public static function update_festi_role_prices( $post_id, array $prices ) {
+		$post_id = absint( $post_id );
+		if ( ! $post_id || empty( $prices ) ) {
+			return false;
+		}
+
+		$data = self::get_festi_role_prices( $post_id );
+		if ( ! is_array( $data ) ) {
+			$data = array();
+		}
+
+		$sale_prices = isset( $data[ self::FESTI_SALE_KEY ] ) ? self::decode_price_data( $data[ self::FESTI_SALE_KEY ] ) : array();
+		if ( ! is_array( $sale_prices ) ) {
+			$sale_prices = array();
+		}
+
+		foreach ( $prices as $role => $values ) {
+			$role = sanitize_key( $role );
+			if ( '' === $role || ! is_array( $values ) ) {
+				continue;
+			}
+
+			if ( array_key_exists( 'regular', $values ) ) {
+				$data[ $role ] = (string) $values['regular'];
+			}
+			if ( array_key_exists( 'sale', $values ) ) {
+				$sale_prices[ $role ] = (string) $values['sale'];
+			}
+		}
+
+		if ( ! empty( $sale_prices ) || isset( $data[ self::FESTI_SALE_KEY ] ) ) {
+			$data[ self::FESTI_SALE_KEY ] = $sale_prices;
+		}
+
+		$json = wp_json_encode( $data );
+		if ( false === $json ) {
+			return false;
+		}
+
+		update_post_meta( $post_id, self::FESTI_META_KEY, $json );
+		return true;
 	}
 }
