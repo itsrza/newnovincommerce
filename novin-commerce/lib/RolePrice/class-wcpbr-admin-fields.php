@@ -5,10 +5,18 @@ if ( ! defined( 'ABSPATH' ) ) {
 
 class NovinCommerce_RolePrice_Admin_Fields {
 
+	private $rendered_simple_fields    = array();
+	private $rendered_variation_fields = array();
+
 	public function __construct() {
+		// WooCommerce has moved the location of the pricing action between
+		// product-data templates over time. Register both supported locations
+		// and render each product only once.
 		add_action( 'woocommerce_product_options_pricing', array( $this, 'render_simple_product_fields' ) );
+		add_action( 'woocommerce_product_options_general_product_data', array( $this, 'render_simple_product_fields' ), 20 );
 
 		add_action( 'woocommerce_variation_options_pricing', array( $this, 'render_variation_fields' ), 10, 3 );
+		add_action( 'woocommerce_variation_options_inventory', array( $this, 'render_variation_fields' ), 20, 3 );
 
 		add_action( 'woocommerce_process_product_meta', array( $this, 'save_simple_product_fields' ) );
 
@@ -22,6 +30,13 @@ class NovinCommerce_RolePrice_Admin_Fields {
 			.wcpbr_field_wrapper { border-top: 1px dashed #ddd; padding-top: 10px; margin-top: 10px; }
 			.wcpbr_field_wrapper .wcpbr_role_title { font-weight: 600; padding: 8px 12px 0; color: #2271b1; }
 		</style>';
+	}
+
+	private function can_edit_product( $post_id ) {
+		return current_user_can( 'edit_product', $post_id )
+			|| current_user_can( 'edit_post', $post_id )
+			|| current_user_can( 'edit_products' )
+			|| current_user_can( 'manage_woocommerce' );
 	}
 
 	private function get_role_field_value( $post_id, $role_key, $type ) {
@@ -40,11 +55,17 @@ class NovinCommerce_RolePrice_Admin_Fields {
 	public function render_simple_product_fields() {
 		global $post;
 
-		if ( ! $post || ! current_user_can( 'edit_product', $post->ID ) ) {
+		if ( ! $post || ! $this->can_edit_product( $post->ID ) ) {
 			return;
 		}
 
-		wp_nonce_field( 'wcpbr_save_simple_' . $post->ID, 'wcpbr_simple_nonce' );
+		$post_id = absint( $post->ID );
+		if ( isset( $this->rendered_simple_fields[ $post_id ] ) ) {
+			return;
+		}
+		$this->rendered_simple_fields[ $post_id ] = true;
+
+		wp_nonce_field( 'wcpbr_save_simple_' . $post_id, 'wcpbr_simple_nonce' );
 
 		echo '<div class="wcpbr_field_wrapper options_group">';
 		echo '<p class="wcpbr_role_title">' . esc_html__( 'قیمت بر اساس نقش کاربر', 'novin-commerce' ) . '</p>';
@@ -78,9 +99,15 @@ class NovinCommerce_RolePrice_Admin_Fields {
 	}
 
 	public function render_variation_fields( $loop, $variation_data, $variation ) {
-		if ( ! ( $variation instanceof WC_Product_Variation ) || ! current_user_can( 'edit_product', $variation->ID ) ) {
+		if ( ! $variation || ! is_object( $variation ) || ! isset( $variation->ID ) || ! $this->can_edit_product( $variation->ID ) ) {
 			return;
 		}
+
+		$variation_id = absint( $variation->ID );
+		if ( isset( $this->rendered_variation_fields[ $variation_id ] ) ) {
+			return;
+		}
+		$this->rendered_variation_fields[ $variation_id ] = true;
 
 		if ( 0 === (int) $loop ) {
 			wp_nonce_field( 'wcpbr_save_variations', 'wcpbr_variation_nonce' );
@@ -177,7 +204,7 @@ class NovinCommerce_RolePrice_Admin_Fields {
 			return;
 		}
 
-		if ( ! current_user_can( 'edit_product', $post_id ) ) {
+		if ( ! $this->can_edit_product( $post_id ) ) {
 			return;
 		}
 
@@ -194,7 +221,7 @@ class NovinCommerce_RolePrice_Admin_Fields {
 			return;
 		}
 
-		if ( ! current_user_can( 'edit_product', $variation_id ) ) {
+		if ( ! $this->can_edit_product( $variation_id ) ) {
 			return;
 		}
 

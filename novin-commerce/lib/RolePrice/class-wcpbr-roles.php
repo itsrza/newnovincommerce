@@ -42,17 +42,24 @@ class NovinCommerce_RolePrice_Roles {
 	}
 
 	public static function get_roles() {
-		$config = self::get_roles_config();
-		$roles  = array();
+		$config       = self::get_roles_config();
+		$roles        = array();
+		$known_roles  = self::get_all_wp_roles();
 
 		foreach ( $config as $role_key => $data ) {
 			$role_key = sanitize_key( $role_key );
 			if ( '' === $role_key || empty( $data['active'] ) ) {
 				continue;
 			}
-			if ( ! self::wp_role_exists( $role_key ) ) {
+
+			// get_all_wp_roles() is the authoritative list on admin product
+			// screens. Some custom-role plugins register a role name there
+			// before get_role() becomes available, so do not hide the price
+			// fields merely because the latter returns false for one request.
+			if ( ! array_key_exists( $role_key, $known_roles ) && ! self::wp_role_exists( $role_key ) ) {
 				continue;
 			}
+
 			$label              = isset( $data['label'] ) && '' !== trim( (string) $data['label'] ) ? $data['label'] : $role_key;
 			$roles[ $role_key ] = $label;
 		}
