@@ -71,8 +71,19 @@ final class Currency_Conversion {
 		// display without converting a new order a second time.
 		add_action( 'woocommerce_checkout_create_order', array( __CLASS__, 'mark_checkout_order_unit' ), 10, 2 );
 		add_action( 'woocommerce_new_order', array( __CLASS__, 'mark_new_order_unit' ), 10, 2 );
-		add_filter( 'woocommerce_order_get_total', array( __CLASS__, 'filter_order_amount' ), $priority, 2 );
-		add_filter( 'woocommerce_order_get_subtotal', array( __CLASS__, 'filter_order_amount' ), $priority, 2 );
+		foreach ( array(
+			'woocommerce_order_get_total',
+			'woocommerce_order_get_subtotal',
+			'woocommerce_order_get_total_tax',
+			'woocommerce_order_get_cart_tax',
+			'woocommerce_order_get_shipping_total',
+			'woocommerce_order_get_shipping_tax',
+			'woocommerce_order_get_discount_total',
+			'woocommerce_order_get_discount_tax',
+			'woocommerce_order_get_fee_total',
+		) as $filter ) {
+			add_filter( $filter, array( __CLASS__, 'filter_order_amount' ), $priority, 2 );
+		}
 		foreach ( array(
 			'woocommerce_order_item_get_total',
 			'woocommerce_order_item_get_subtotal',
