@@ -46,10 +46,17 @@ class NovinCommerce_RolePrice_Admin_Fields {
 		$value = get_post_meta( $post_id, $meta_key, true );
 
 		if ( ! is_array( $value ) && ! is_object( $value ) && '' !== trim( (string) $value ) ) {
-			return $value;
+			return $this->to_display_price( $value );
 		}
 
-		return NovinCommerce_RolePrice_Roles::get_compatible_role_price( $post_id, $role_key, $type );
+		return $this->to_display_price( NovinCommerce_RolePrice_Roles::get_compatible_role_price( $post_id, $role_key, $type ) );
+	}
+
+	private function to_display_price( $value ) {
+		if ( class_exists( '\\MobinDev\\Novin_Commerce\\Common\\Currency_Conversion' ) ) {
+			return \\MobinDev\\Novin_Commerce\\Common\\Currency_Conversion::to_display( $value );
+		}
+		return $value;
 	}
 
 	public function render_simple_product_fields() {
@@ -159,6 +166,10 @@ class NovinCommerce_RolePrice_Admin_Fields {
 
 		if ( '' === $formatted || ! is_numeric( $formatted ) || (float) $formatted < 0 ) {
 			return '';
+		}
+
+		if ( class_exists( '\\MobinDev\\Novin_Commerce\\Common\\Currency_Conversion' ) ) {
+			$formatted = \\MobinDev\\Novin_Commerce\\Common\\Currency_Conversion::to_storage( $formatted );
 		}
 
 		return $formatted;

@@ -313,7 +313,7 @@ class Shortcode {
 		$per_page     = absint( $this->atts['per_page'] );
 		$per_page     = min( 100, max( 1, $per_page ) );
 		$username     = SettingAPI::get( 'api_user' );
-		$password     = SettingAPI::get( 'api_pass' );
+		$password     = SettingAPI::getSecret( 'api_pass' );
 
 		$maybe_page_number = (int) ( $_REQUEST['novin_transactions_page'] ?? null );
 		if ( $maybe_page_number > 0 ) {

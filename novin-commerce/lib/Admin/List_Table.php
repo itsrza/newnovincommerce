@@ -52,9 +52,6 @@ abstract class List_Table extends \WP_List_Table {
     );
 
 		$actions = [];
-		if ( in_array( $this->getItemType( $item ), [ 'product', 'variation' ], true ) ) {
-			$actions['detail'] = sprintf('<a href="%s">جزئیات اتصال</a>', esc_url( add_query_arg([ 'page' => 'novin-commerce-dashboard', 'item_id' => absint( $this->getID( $item ) ), 'item_type' => $this->getItemType( $item ) ], admin_url( 'admin.php' ) ) ));
-		}
 		$actions['sync'] = sprintf('<a href="%s">همگام‌سازی</a>', esc_url(add_query_arg([
 				'page'     => wp_unslash($_REQUEST['page']),
 				'action'   => 'sync',
@@ -169,8 +166,8 @@ function extra_tablenav($which) {
         if ( 'product' === $this->name ) {
             $type_filter = isset($_REQUEST['type_filter']) ? sanitize_key(wp_unslash($_REQUEST['type_filter'])) : 'all';
             $sync_filter = isset($_REQUEST['sync_filter']) ? sanitize_key(wp_unslash($_REQUEST['sync_filter'])) : 'all';
-            echo '<select name="type_filter"><option value="all">همه نوع‌ها</option><option value="product"'.selected($type_filter,'product',false).'>کالای اصلی</option><option value="variation"'.selected($type_filter,'variation',false).'>Variation</option></select>';
-            echo '<select name="sync_filter"><option value="all">همه وضعیت‌ها</option><option value="synced"'.selected($sync_filter,'synced',false).'>همگام‌شده</option><option value="pending"'.selected($sync_filter,'pending',false).'>بدون زمان Sync</option></select>';
+            echo '<select name="type_filter"><option value="all">همه نوع‌ها</option><option value="product"'.selected($type_filter,'product',false).'>کالای اصلی</option><option value="variation"'.selected($type_filter,'variation',false).'>تنوع متغیر</option></select>';
+            echo '<select name="sync_filter"><option value="all">همه وضعیت‌ها</option><option value="synced"'.selected($sync_filter,'synced',false).'>همگام‌شده</option><option value="pending"'.selected($sync_filter,'pending',false).'>بدون زمان همگام‌سازی</option></select>';
         }
         echo '<select id="guid_filter" name="guid_filter">';
         echo '<option value="all"' . selected($current_filter, 'all', false) . '>همه اقلام</option>';
@@ -221,30 +218,10 @@ function extra_tablenav($which) {
 	}
 
 		public function search_box($text, $input_id) {
-    if (empty($_REQUEST['s']) && !$this->has_items()) {
-        return;
-    }
-
-    $input_id = $input_id . '-search-input';
-
-    if (!empty($_REQUEST['orderby'])) {
-        echo '<input type="hidden" name="orderby" value="' . esc_attr($_REQUEST['orderby']) . '" />';
-    }
-    if (!empty($_REQUEST['order'])) {
-        echo '<input type="hidden" name="order" value="' . esc_attr($_REQUEST['order']) . '" />';
-    }
-    if (!empty($_REQUEST['type_filter'])) { echo '<input type="hidden" name="type_filter" value="' . esc_attr($_REQUEST['type_filter']) . '" />'; }
-    if (!empty($_REQUEST['sync_filter'])) { echo '<input type="hidden" name="sync_filter" value="' . esc_attr($_REQUEST['sync_filter']) . '" />'; }
-    if (!empty($_REQUEST['guid_filter'])) {
-        echo '<input type="hidden" name="guid_filter" value="' . esc_attr($_REQUEST['guid_filter']) . '" />';
-    }
-
-    echo '<p class="search-box">';
-    echo '<label class="screen-reader-text" for="' . esc_attr($input_id) . '">' . esc_html($text) . ':</label>';
-    echo '<input type="search" id="' . esc_attr($input_id) . '" name="s" value="' . esc_attr($_REQUEST['s'] ?? '') . '" />';
-    submit_button(esc_attr($text), '', '', false, ['id' => 'search-submit']);
-    echo '</p>';
-}
+			// The useful search field is rendered beside the filters in
+			// extra_tablenav(). Do not render WP_List_Table's second search box.
+			return;
+		}
 
 	// هسته‌ی جدول: آماده‌سازی داده‌ها
 	final function prepare_items() {

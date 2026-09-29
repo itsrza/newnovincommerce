@@ -6,6 +6,7 @@ use MobinDev\Novin_Commerce\Digits\Common\Digits_Settings;
 use MobinDev\Novin_Commerce\Digits\Common\Otp_Manager;
 use MobinDev\Novin_Commerce\Digits\Common\Sms_Log;
 use MobinDev\Novin_Commerce\Digits\SmsGateways\Gateway_Registry;
+use MobinDev\Novin_Commerce\Common\Text_Encoding;
 use MobinDev\Novin_Commerce\Plugin;
 
 /**
@@ -224,6 +225,11 @@ class Digits_Setting_Menu {
 		}
 
 		$tab   = isset( $_POST['tab'] ) ? sanitize_key( wp_unslash( $_POST['tab'] ) ) : '';
+		if ( 'sms' !== $tab ) {
+			// Autosave is intentionally limited to the SMS/gateway tab. The
+			// general and WooCommerce tabs are saved only by the shared form.
+			wp_send_json_error( [ 'message' => 'ذخیره خودکار فقط برای پیامک و درگاه فعال است.' ], 400 );
+		}
 		$field = isset( $_POST['field'] ) ? sanitize_key( wp_unslash( $_POST['field'] ) ) : '';
 		$value = isset( $_POST['value'] ) ? (string) wp_unslash( $_POST['value'] ) : '';
 		$result = $this->save_single_field( $tab, $field, $value );
@@ -408,7 +414,7 @@ class Digits_Setting_Menu {
 									<td><?php echo esc_html( $row->gateway ); ?></td>
 									<td><?php echo esc_html( $row->phone ); ?></td>
 									<td><?php echo 'success' === $row->status ? '<span style="color:#16a34a">موفق</span>' : '<span style="color:#dc2626">ناموفق</span>'; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped ?></td>
-									<td><?php echo esc_html( $row->message ); ?></td>
+									<td><?php echo esc_html( Text_Encoding::normalize( $row->message ) ); ?></td>
 								</tr>
 							<?php endforeach; ?>
 						</tbody>
@@ -521,7 +527,7 @@ class Digits_Setting_Menu {
 										<th><label for="<?php echo esc_attr( $field_id ); ?>"><?php echo esc_html( $field['label'] ); ?></label></th>
 										<td>
 													<input class="regular-text" type="<?php echo esc_attr( $input_type ); ?>" id="<?php echo esc_attr( $field_id ); ?>" name="<?php echo esc_attr( $field_id ); ?>" value="<?php echo esc_attr( $display_value ); ?>" data-password-field="<?php echo 'password' === $field['type'] ? '1' : '0'; ?>" data-password-masked="0" autocomplete="off" placeholder="<?php echo 'password' === $field['type'] ? 'برای تغییر وارد کنید؛ برای حفظ مقدار فعلی خالی بگذارید' : ''; ?>">
-											<?php if ( ! empty( $field['description'] ) ) : ?>
+											<?php if ( ! empty( $field['description'] ) && 'password' !== $field['type'] ) : ?>
 												<p class="description"><?php echo esc_html( $field['description'] ); ?></p>
 											<?php endif; ?>
 										</td>

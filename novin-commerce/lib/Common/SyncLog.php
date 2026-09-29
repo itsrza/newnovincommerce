@@ -15,7 +15,7 @@ class SyncLog {
                 'status'     => $status,
                 'item_type'  => sanitize_key( $item_type ),
                 'item_id'    => absint( $item_id ),
-                'message'    => sanitize_textarea_field( $message ),
+                'message'    => sanitize_textarea_field( Text_Encoding::normalize( $message ) ),
                 'context'    => $context_json,
                 'created_at'=> current_time( 'mysql', true ),
             ],
@@ -27,7 +27,13 @@ class SyncLog {
         global $wpdb;
         $table = $wpdb->prefix . 'novin_commerce_sync_logs';
         $limit = min( 50, max( 1, absint( $limit ) ) );
-        return $wpdb->get_results( $wpdb->prepare( "SELECT * FROM {$table} ORDER BY id DESC LIMIT %d", $limit ) );
+        $rows  = $wpdb->get_results( $wpdb->prepare( "SELECT * FROM {$table} ORDER BY id DESC LIMIT %d", $limit ) );
+        foreach ( (array) $rows as $row ) {
+            if ( isset( $row->message ) ) {
+                $row->message = Text_Encoding::normalize( $row->message );
+            }
+        }
+        return $rows;
     }
 
     public static function count_since( $seconds = 86400, $status = null ) {

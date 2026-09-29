@@ -41,7 +41,7 @@ class Activator {
 		Application::bootWp();
 		self::createTables();
 		self::setSettings();
-		update_option( 'novin_commerce_schema_version', '4' );
+		update_option( 'novin_commerce_schema_version', '5' );
 	}
 
 	public static function createTables() {
@@ -81,13 +81,28 @@ class Activator {
 				$table->index( [ 'status', 'created_at' ] );
 			} );
 		}
+
+		self::ensure_utf8_tables();
+	}
+
+	private static function ensure_utf8_tables() {
+		global $wpdb;
+		$charset = isset( $wpdb->charset ) && preg_match( '/^[a-z0-9_]+$/i', $wpdb->charset ) ? $wpdb->charset : 'utf8mb4';
+		$collate = isset( $wpdb->collate ) && preg_match( '/^[a-z0-9_]+$/i', $wpdb->collate ) ? $wpdb->collate : '';
+		foreach ( array( $wpdb->prefix . 'novin_commerce_sync_logs' ) as $table ) {
+			$sql = "ALTER TABLE {$table} CONVERT TO CHARACTER SET {$charset}";
+			if ( '' !== $collate ) {
+				$sql .= " COLLATE {$collate}";
+			}
+			$wpdb->query( $sql ); // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.PreparedSQL.NotPrepared -- identifiers are plugin-owned and charset values are allow-listed.
+		}
 	}
 
 	public static function maybeUpgrade() {
 		Application::bootWp();
-		if ( '4' !== (string) get_option( 'novin_commerce_schema_version', '' ) ) {
+		if ( '5' !== (string) get_option( 'novin_commerce_schema_version', '' ) ) {
 			self::createTables();
-			update_option( 'novin_commerce_schema_version', '4' );
+			update_option( 'novin_commerce_schema_version', '5' );
 		}
 	}
 
@@ -97,6 +112,9 @@ class Activator {
 		}
 		if ( ! SettingAPI::get( 'api_url' ) ) {
 			SettingAPI::set( 'api_url', 'https://novinrank.ir/' );
+		}
+		if ( null === SettingAPI::get( 'novin_toman_conversion_enabled', null ) ) {
+			SettingAPI::set( 'novin_toman_conversion_enabled', 'on' );
 		}
 
 		//turn off woocommerce tracking

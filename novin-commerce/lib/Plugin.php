@@ -18,6 +18,7 @@ namespace MobinDev\Novin_Commerce;
 use As247\WpEloquent\Application;
 use MobinDev\Novin_Commerce\Admin\AdminNotice;
 use MobinDev\Novin_Commerce\Admin\Menu;
+use MobinDev\Novin_Commerce\Common\Currency_Conversion;
 use MobinDev\Novin_Commerce\Common\Woocommerce;
 use MobinDev\Novin_Commerce\Digits\Digits_Module;
 use MobinDev\Novin_Commerce\Frontend\Shortcode;
@@ -65,7 +66,7 @@ class Plugin {
 	 * @access   protected
 	 * @var      string $version The current version of the plugin.
 	 */
-	protected $version = '1.14.0';
+	protected $version = '1.15.0';
 
 	/**
 	 * Define the core functionality of the plugin.
@@ -135,6 +136,10 @@ class Plugin {
 		new Woocommerce_Menu( $this );
 
 		if ( class_exists( '\WooCommerce' ) ) {
+			// Register unit conversion before role pricing. The conversion
+			// callback runs at the final priority, after any role price has
+			// been selected, so role prices are divided exactly once.
+			Currency_Conversion::boot();
 			\MobinDev\Novin_Commerce\RolePrice\Bootstrap::boot();
 		}
 

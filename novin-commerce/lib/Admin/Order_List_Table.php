@@ -27,7 +27,8 @@ class Order_List_Table extends List_Table {
 	public function column_default( $item, $column_name ) {
 		switch ( $column_name ) {
 			case 'total':
-				return $item->get_total();
+				$total = $item->get_total();
+				return function_exists( 'wc_price' ) ? wc_price( $total ) : esc_html( (string) $total );
 			case 'user':
 				$user = $item->get_user();
 				return $user instanceof \WP_User

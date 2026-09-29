@@ -15,7 +15,7 @@ use As247\WpEloquent\Support\Facades\Schema;
 class Digits_Activator {
 
 	const SCHEMA_VERSION_OPTION = 'novin_commerce_digits_schema_version';
-	const CURRENT_SCHEMA        = '1';
+	const CURRENT_SCHEMA        = '2';
 
 	public static function maybe_upgrade() {
 		Application::bootWp();
@@ -58,6 +58,21 @@ class Digits_Activator {
 					$table->index( [ 'status', 'created_at' ] );
 				}
 			);
+		}
+
+		self::ensure_utf8_tables();
+	}
+
+	private static function ensure_utf8_tables() {
+		global $wpdb;
+		$charset = isset( $wpdb->charset ) && preg_match( '/^[a-z0-9_]+$/i', $wpdb->charset ) ? $wpdb->charset : 'utf8mb4';
+		$collate = isset( $wpdb->collate ) && preg_match( '/^[a-z0-9_]+$/i', $wpdb->collate ) ? $wpdb->collate : '';
+		foreach ( array( $wpdb->prefix . 'novin_commerce_digits_sms_log' ) as $table ) {
+			$sql = "ALTER TABLE {$table} CONVERT TO CHARACTER SET {$charset}";
+			if ( '' !== $collate ) {
+				$sql .= " COLLATE {$collate}";
+			}
+			$wpdb->query( $sql ); // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.PreparedSQL.NotPrepared -- plugin-owned identifiers and allow-listed charset values.
 		}
 	}
 }

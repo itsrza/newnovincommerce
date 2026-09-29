@@ -65,8 +65,8 @@ class Sync_List_Table extends \WP_List_Table {
                 return $id . $this->row_actions( $actions );
             case 'item_id': return absint( $item['item_id'] ?? 0 );
             case 'item_type':
-                $labels = ['product'=>'کالای اصلی','variation'=>'Variation','order'=>'فاکتور','category'=>'دسته‌بندی','user'=>'شخص'];
-                return esc_html( $labels[ $item['item_type'] ?? '' ] ?? (string)($item['item_type'] ?? '—') );
+                $labels = array( 'product' => 'کالای اصلی', 'variation' => 'تنوع متغیر', 'order' => 'فاکتور', 'category' => 'دسته‌بندی', 'user' => 'شخص' );
+                return esc_html( $labels[ $item['item_type'] ?? '' ] ?? 'مورد تبادل' );
             case 'priority':
                 $priority = (int)($item['priority'] ?? 0);
                 return $priority > 0 ? '<strong class="novin-sync-priority-high">بالا (' . $priority . ')</strong>' : '<span>عادی</span>';

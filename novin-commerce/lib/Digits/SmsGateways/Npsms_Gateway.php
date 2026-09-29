@@ -48,7 +48,7 @@ class Npsms_Gateway implements Sms_Gateway_Interface {
 				'label'       => 'رمز عبور (Password)',
 				'type'        => 'password',
 				'default'     => '',
-				'description' => 'رمز عبور پنل NPSMS شما. این مقدار در پایگاه‌داده به‌صورت رمزنگاری‌شده ذخیره می‌شود.',
+				'description' => 'رمز عبور پنل NPSMS شما.',
 			],
 			[
 				'key'         => 'sender_number',

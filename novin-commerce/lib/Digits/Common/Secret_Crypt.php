@@ -4,9 +4,9 @@ namespace MobinDev\Novin_Commerce\Digits\Common;
 
 /**
  * Small helper for encrypting/decrypting sensitive settings values
- * (currently: SMS gateway passwords) before they are stored in the
- * database, instead of keeping them as plain text inside a WordPress
- * option like every other setting.
+ * (currently: SMS gateway and accounting-connection passwords) before they
+ * are stored in the database, instead of keeping them as plain text inside
+ * a WordPress option like every other setting.
  *
  * This intentionally does NOT introduce a new secret to manage: it
  * derives its key from WordPress's own AUTH_KEY/AUTH_SALT constants
@@ -45,7 +45,8 @@ class Secret_Crypt {
 		if ( ! function_exists( 'openssl_encrypt' ) ) {
 			// No OpenSSL available: fall back to storing as-is rather than
 			// silently losing the value. This mirrors how the plugin
-			// already stores api_pass in SettingAPI without encryption.
+			// Some hosts do not provide OpenSSL; retain the value rather than
+			// silently losing a connection credential.
 			return $plain;
 		}
 

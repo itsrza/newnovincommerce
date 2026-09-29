@@ -20,7 +20,6 @@ class Product_List_Table extends List_Table {
 			'category'        => 'دسته‌بندی',
 			'price'           => 'قیمت',
 			'stock_quantity'  => 'موجودی',
-			'id'              => 'ID',
 			'accounting'      => 'وضعیت حسابداری',
 			'sync_date'       => 'زمان همگام‌سازی',
 		];
@@ -32,9 +31,12 @@ class Product_List_Table extends List_Table {
 				return $this->column_name_with_slug( $item );
 			case 'type':
 				if ( $item->is_type( 'variation' ) ) {
-					return '<span class="novin-product-type novin-product-variation">Variation</span>';
+					return '<span class="novin-product-type novin-product-variation">تنوع متغیر</span>';
 				}
-				return '<span class="novin-product-type">Product</span>';
+				if ( $item->is_type( 'variable' ) ) {
+					return '<span class="novin-product-type novin-product-variable">کالای متغیر</span>';
+				}
+				return '<span class="novin-product-type">کالای ساده</span>';
 			case 'sku':
 				return $this->column_sku( $item );
 			case 'category':
@@ -224,7 +226,7 @@ class Product_List_Table extends List_Table {
 					}
 					$parts[] = $label . ': ' . $value;
 				}
-				$name = $this->decode_value( $parent->get_name() ) . ( $parts ? ' — ' . implode( ', ', $parts ) : ' — Variation' );
+				$name = $this->decode_value( $parent->get_name() ) . ( $parts ? ' — ' . implode( ', ', $parts ) : ' — تنوع متغیر' );
 			}
 		}
 		return $name;

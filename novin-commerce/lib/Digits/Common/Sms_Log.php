@@ -2,6 +2,8 @@
 
 namespace MobinDev\Novin_Commerce\Digits\Common;
 
+use MobinDev\Novin_Commerce\Common\Text_Encoding;
+
 /**
  * Records every SMS send attempt (OTP or otherwise) so the admin settings
  * page can show a success/failure report, independent of the core
@@ -26,8 +28,8 @@ class Sms_Log {
 				'gateway'      => sanitize_key( $gateway ),
 				'phone'        => sanitize_text_field( $phone ),
 				'status'       => $status,
-				'message'      => sanitize_textarea_field( $message ),
-				'raw_response' => sanitize_textarea_field( $raw_response ),
+				'message'      => sanitize_textarea_field( Text_Encoding::normalize( $message ) ),
+				'raw_response' => sanitize_textarea_field( Text_Encoding::normalize( $raw_response ) ),
 				'created_at'   => current_time( 'mysql', true ),
 			],
 			[ '%s', '%s', '%s', '%s', '%s', '%s' ]
@@ -41,7 +43,16 @@ class Sms_Log {
 		$table = self::table();
 
 		// phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared -- table name is not user input; $limit is cast to int above.
-		return $wpdb->get_results( $wpdb->prepare( "SELECT * FROM {$table} ORDER BY id DESC LIMIT %d", $limit ) );
+		$rows = $wpdb->get_results( $wpdb->prepare( "SELECT * FROM {$table} ORDER BY id DESC LIMIT %d", $limit ) );
+		foreach ( (array) $rows as $row ) {
+			if ( isset( $row->message ) ) {
+				$row->message = Text_Encoding::normalize( $row->message );
+			}
+			if ( isset( $row->raw_response ) ) {
+				$row->raw_response = Text_Encoding::normalize( $row->raw_response );
+			}
+		}
+		return $rows;
 	}
 
 	public static function counts_since( $seconds = 86400 ) {
