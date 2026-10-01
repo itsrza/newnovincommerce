@@ -21,7 +21,7 @@ final class Bootstrap {
         // and Festi-compatible price reader.
         self::$booted = true;
         if ( class_exists( '\\MobinDev\\Novin_Commerce\\Common\\Currency_Conversion' ) ) {
-            \\MobinDev\\Novin_Commerce\\Common\\Currency_Conversion::boot();
+            \MobinDev\Novin_Commerce\Common\Currency_Conversion::boot();
         }
 
         $files = array(
