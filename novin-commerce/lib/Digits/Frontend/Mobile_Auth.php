@@ -18,6 +18,7 @@ class Mobile_Auth {
 
 	private $plugin;
 	private $woo_buffer_level = null;
+	private $full_page_buffer_level = null;
 
 	public function __construct( Plugin $plugin ) {
 		$this->plugin = $plugin;
@@ -40,6 +41,11 @@ class Mobile_Auth {
 		// below are never fired; the content fallback keeps the account URL a
 		// usable login/register page instead of showing an unrelated cart.
 		add_filter( 'the_content', [ $this, 'replace_account_login_content' ], 999 );
+		// Woodmart Plus and similar builders can print the account template
+		// outside the_content and outside WooCommerce's classic form hooks. Keep
+		// this page-scoped safety net as the final fallback for that case.
+		add_action( 'template_redirect', [ $this, 'start_full_page_capture' ], 0 );
+		add_action( 'shutdown', [ $this, 'finish_full_page_capture' ], 0 );
 
 		// The WooCommerce template renders its default forms between these two
 		// actions. Buffer that output and replace it only when the module is on.
@@ -134,6 +140,101 @@ class Mobile_Auth {
 
 		$redirect_to = function_exists( 'wc_get_page_permalink' ) ? wc_get_page_permalink( 'myaccount' ) : '';
 		echo $this->render_form( 'woocommerce', $redirect_to ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped
+	}
+
+	/**
+	 * Start a final, page-level capture for account pages rendered outside the
+	 * normal WordPress/WooCommerce content hooks.
+	 *
+	 * @return void
+	 */
+	public function start_full_page_capture() {
+		if ( ! $this->is_enabled() || is_user_logged_in() || null !== $this->full_page_buffer_level ) {
+			return;
+		}
+		if ( ! function_exists( 'is_account_page' ) || ! is_account_page() ) {
+			return;
+		}
+
+		// Enqueue before wp_head/wp_footer render. This is idempotent when the
+		// normal wp_enqueue_scripts hook already queued the Digits assets.
+		$this->enqueue_assets();
+		$this->full_page_buffer_level = ob_get_level();
+		ob_start();
+	}
+
+	/**
+	 * Finish the page-level capture and replace an account page that never
+	 * rendered the Digits form. This covers builders such as Woodmart Plus
+	 * that print an empty-cart template directly during page rendering.
+	 *
+	 * @return void
+	 */
+	public function finish_full_page_capture() {
+		if ( null === $this->full_page_buffer_level ) {
+			return;
+		}
+
+		$html = '';
+		while ( ob_get_level() > $this->full_page_buffer_level ) {
+			$chunk = ob_get_clean();
+			if ( false === $chunk ) {
+				break;
+			}
+			// Inner buffers contain the later part of the document; prepend
+			// each outer buffer so the original output order is preserved.
+			$html = $chunk . $html;
+		}
+		$this->full_page_buffer_level = null;
+
+		if ( false !== strpos( $html, 'novin-digits-auth' ) ) {
+			echo $html; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped
+			return;
+		}
+
+		$redirect_to = function_exists( 'wc_get_page_permalink' ) ? wc_get_page_permalink( 'myaccount' ) : home_url( '/' );
+		$form         = $this->render_form( 'woocommerce-fallback', $redirect_to );
+		$form        .= $this->render_full_page_assets();
+		$body_matches = 0;
+		$updated_html  = preg_replace_callback(
+			'~(<body\b[^>]*>).*?(</body\s*>)~is',
+			static function ( $matches ) use ( $form ) {
+				return $matches[1] . $form . $matches[2];
+			},
+			$html,
+			1,
+			$body_matches
+		);
+
+		if ( 1 === $body_matches && is_string( $updated_html ) ) {
+			echo $updated_html; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped
+			return;
+		}
+
+		// Last-resort fallback for a non-standard response without body tags.
+		echo $form . $html; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped
+	}
+
+	/**
+	 * Re-emit the assets because the full-page fallback replaces the body and
+	 * can therefore remove scripts normally printed by wp_footer.
+	 *
+	 * @return string
+	 */
+	private function render_full_page_assets() {
+		$style_url  = add_query_arg( 'ver', $this->plugin->get_version(), $this->plugin->getFrontStyleUrl() . 'digits.css' );
+		$script_url = add_query_arg( 'ver', $this->plugin->get_version(), $this->plugin->getFrontScriptUrl() . 'digits.js' );
+		$config     = wp_json_encode(
+			[
+				'ajaxUrl' => admin_url( 'admin-ajax.php' ),
+				'nonce'   => wp_create_nonce( 'novin-digits-auth' ),
+			],
+			JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT
+		);
+
+		return '<link rel="stylesheet" id="novin-commerce-digits-auth-full-page-css" href="' . esc_url( $style_url ) . '" type="text/css" media="all" />' .
+			'<script id="novin-commerce-digits-auth-full-page-config">window.NovinDigitsAuth=' . $config . ';</script>' .
+			'<script id="novin-commerce-digits-auth-full-page-js" src="' . esc_url( $script_url ) . '"></script>';
 	}
 
 	/**
