@@ -4,6 +4,7 @@ namespace MobinDev\Novin_Commerce\Digits;
 
 use MobinDev\Novin_Commerce\Digits\Admin\Digits_Setting_Menu;
 use MobinDev\Novin_Commerce\Digits\Common\Digits_Activator;
+use MobinDev\Novin_Commerce\Digits\Common\Digits_Settings;
 use MobinDev\Novin_Commerce\Digits\Frontend\Mobile_Auth;
 use MobinDev\Novin_Commerce\Digits\Frontend\Woocommerce_Integration;
 use MobinDev\Novin_Commerce\Plugin;
@@ -25,6 +26,14 @@ class Digits_Module {
 
 		$settings_menu = new Digits_Setting_Menu( $plugin );
 		$settings_menu->hooks();
+
+		// Keep the settings page and migration available while the optional
+		// mobile-auth feature is disabled. Do not register frontend auth,
+		// WooCommerce phone filters, AJAX endpoints or page-capture fallbacks
+		// until the site owner explicitly enables Digits.
+		if ( 'on' !== Digits_Settings::get( 'enabled', 'off' ) ) {
+			return;
+		}
 
 		$woocommerce_integration = new Woocommerce_Integration( $plugin );
 		$woocommerce_integration->hooks();
