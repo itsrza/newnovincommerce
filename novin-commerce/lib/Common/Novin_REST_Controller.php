@@ -1,10 +1,10 @@
 <?php
 
-namespace MobinDev\Novin_Commerce\Common;
+namespace Novinwp\Novin_Commerce\Common;
 
 use Carbon\Carbon;
-use MobinDev\Novin_Commerce\Models\Sync;
-use MobinDev\Novin_Commerce\Plugin;
+use Novinwp\Novin_Commerce\Models\Sync;
+use Novinwp\Novin_Commerce\Plugin;
 use Morilog\Jalali\Jalalian;
 
 class Novin_REST_Controller extends \WC_REST_CRUD_Controller {
@@ -807,7 +807,7 @@ class Novin_REST_Controller extends \WC_REST_CRUD_Controller {
 		if ( $jalali ) {
 			$saved = SettingAPI::set( 'sync_datetime', $jalali->getTimestamp() );
 			if ( $saved ) {
-				\MobinDev\Novin_Commerce\Common\SyncLog::add( 'sync_datetime', 'success', '', 0, 'زمان مرجع Sync از طریق API تغییر کرد.', [ 'datetime' => $datetime ] );
+				\Novinwp\Novin_Commerce\Common\SyncLog::add( 'sync_datetime', 'success', '', 0, 'زمان مرجع Sync از طریق API تغییر کرد.', [ 'datetime' => $datetime ] );
 				delete_transient( 'novin_commerce_health_v1' );
 			}
 			if ( ! $saved ) {

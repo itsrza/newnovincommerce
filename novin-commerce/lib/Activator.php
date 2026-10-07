@@ -10,13 +10,13 @@
  * @subpackage Novin_Commerce/includes
  */
 
-namespace MobinDev\Novin_Commerce;
+namespace Novinwp\Novin_Commerce;
 
 use As247\WpEloquent\Application;
 use As247\WpEloquent\Database\Schema\Blueprint;
 use As247\WpEloquent\Support\Facades\DB;
 use As247\WpEloquent\Support\Facades\Schema;
-use MobinDev\Novin_Commerce\Common\SettingAPI;
+use Novinwp\Novin_Commerce\Common\SettingAPI;
 
 /**
  * Fired during plugin activation.
@@ -26,7 +26,7 @@ use MobinDev\Novin_Commerce\Common\SettingAPI;
  * @since      1.0.0
  * @package    Novin_Commerce
  * @subpackage Novin_Commerce/includes
- * @author     Mohammad Hosein Mohaddes <mobin7332@gmail.com>
+ * @author     Novinwp <info@npwp.ir>
  */
 class Activator {
 
@@ -133,14 +133,14 @@ class Activator {
 	}
 
 	public static function run_maintenance() {
-		if ( class_exists( '\MobinDev\Novin_Commerce\Common\SyncLog' ) ) {
-			\MobinDev\Novin_Commerce\Common\SyncLog::prune( 30 );
+		if ( class_exists( '\Novinwp\Novin_Commerce\Common\SyncLog' ) ) {
+			\Novinwp\Novin_Commerce\Common\SyncLog::prune( 30 );
 		}
-		if ( class_exists( '\MobinDev\Novin_Commerce\Digits\Common\Sms_Log' ) ) {
-			\MobinDev\Novin_Commerce\Digits\Common\Sms_Log::prune( 30 );
+		if ( class_exists( '\Novinwp\Novin_Commerce\Digits\Common\Sms_Log' ) ) {
+			\Novinwp\Novin_Commerce\Digits\Common\Sms_Log::prune( 30 );
 		}
-		if ( class_exists( '\MobinDev\Novin_Commerce\Digits\Common\Otp_Manager' ) ) {
-			\MobinDev\Novin_Commerce\Digits\Common\Otp_Manager::prune( 2 );
+		if ( class_exists( '\Novinwp\Novin_Commerce\Digits\Common\Otp_Manager' ) ) {
+			\Novinwp\Novin_Commerce\Digits\Common\Otp_Manager::prune( 2 );
 		}
 	}
 

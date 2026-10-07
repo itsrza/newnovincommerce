@@ -1,8 +1,8 @@
 <?php
 
-namespace MobinDev\Novin_Commerce\Frontend;
+namespace Novinwp\Novin_Commerce\Frontend;
 
-use MobinDev\Novin_Commerce\Plugin;
+use Novinwp\Novin_Commerce\Plugin;
 
 class Woocommerce_Menu {
 	/** @var Plugin */

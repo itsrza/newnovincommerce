@@ -1,9 +1,9 @@
 <?php
 
-namespace MobinDev\Novin_Commerce\Common;
+namespace Novinwp\Novin_Commerce\Common;
 
-use MobinDev\Novin_Commerce\Models\Sync as SyncModel;
-use MobinDev\Novin_Commerce\Plugin;
+use Novinwp\Novin_Commerce\Models\Sync as SyncModel;
+use Novinwp\Novin_Commerce\Plugin;
 
 class Sync {
 	/**

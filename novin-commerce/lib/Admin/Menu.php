@@ -1,9 +1,9 @@
 <?php
 
-namespace MobinDev\Novin_Commerce\Admin;
+namespace Novinwp\Novin_Commerce\Admin;
 
-use MobinDev\Novin_Commerce\Models\Sync;
-use MobinDev\Novin_Commerce\Plugin;
+use Novinwp\Novin_Commerce\Models\Sync;
+use Novinwp\Novin_Commerce\Plugin;
 
 class Menu {
 	/**
@@ -64,8 +64,8 @@ class Menu {
 
 		$dashboard = add_submenu_page(
 			'novin-commerce-products',
-			'داشبورد اتصال',
-			'داشبورد اتصال',
+			'داشبورد',
+			'داشبورد',
 			'manage_woocommerce',
 			'novin-commerce-dashboard',
 			[ Connection_Dashboard::class, 'render' ],
@@ -143,7 +143,7 @@ class Menu {
 			'مغایرت‌گیری' . $mismatch_badge,
 			'manage_woocommerce',
 			'novin-commerce-mismatch',
-			[ \MobinDev\Novin_Commerce\Admin\Mismatch_Page::class, 'renderPage' ],
+			[ \Novinwp\Novin_Commerce\Admin\Mismatch_Page::class, 'renderPage' ],
 			'60',
 		);
 

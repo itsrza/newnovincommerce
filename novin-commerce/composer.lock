@@ -4,7 +4,7 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "352e28de120b99d3e2644786a82f62bf",
+    "content-hash": "0b5e53973b8e3637ad87c8e03a12f367",
     "packages": [
         {
             "name": "as247/wp-eloquent",

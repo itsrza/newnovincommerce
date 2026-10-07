@@ -1,8 +1,8 @@
 <?php
 
-namespace MobinDev\Novin_Commerce\Admin;
+namespace Novinwp\Novin_Commerce\Admin;
 
-use MobinDev\Novin_Commerce\Plugin;
+use Novinwp\Novin_Commerce\Plugin;
 
 class Product_Menu extends Item_Menu {
 

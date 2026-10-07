@@ -1,6 +1,6 @@
 <?php
 
-namespace MobinDev\Novin_Commerce\Common;
+namespace Novinwp\Novin_Commerce\Common;
 
 /**
  * Keeps accounting prices in their stored Rial value while exposing an

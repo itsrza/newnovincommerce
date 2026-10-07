@@ -1,6 +1,6 @@
 <?php
 
-namespace MobinDev\Novin_Commerce\Admin;
+namespace Novinwp\Novin_Commerce\Admin;
 
 if (!defined('ABSPATH')) exit;
 if (!class_exists(__NAMESPACE__ . '\\Mismatch_Page')) {

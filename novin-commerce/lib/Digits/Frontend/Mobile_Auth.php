@@ -1,10 +1,10 @@
 <?php
 
-namespace MobinDev\Novin_Commerce\Digits\Frontend;
+namespace Novinwp\Novin_Commerce\Digits\Frontend;
 
-use MobinDev\Novin_Commerce\Digits\Common\Digits_Settings;
-use MobinDev\Novin_Commerce\Digits\Common\Otp_Manager;
-use MobinDev\Novin_Commerce\Plugin;
+use Novinwp\Novin_Commerce\Digits\Common\Digits_Settings;
+use Novinwp\Novin_Commerce\Digits\Common\Otp_Manager;
+use Novinwp\Novin_Commerce\Plugin;
 
 /**
  * Replaces the default WordPress and WooCommerce login/registration forms

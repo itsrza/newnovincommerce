@@ -1,6 +1,6 @@
 <?php
 
-namespace MobinDev\Novin_Commerce\Admin;
+namespace Novinwp\Novin_Commerce\Admin;
 
 if ( ! class_exists( __NAMESPACE__ . '\\AdminNotice' ) ) {
 	class AdminNotice {
@@ -9,11 +9,11 @@ if ( ! class_exists( __NAMESPACE__ . '\\AdminNotice' ) ) {
 		private $cookies = [];
 
 		public function __construct() {
-			
+
 			$cookie_value = $_COOKIE[ self::NAME ] ?? '';
-			
+
 			$this->cookies = json_decode( $cookie_value, true );
-			
+
 			if ( ! $this->cookies ) {
 				$this->cookies = [];
 			}
@@ -84,8 +84,8 @@ if ( ! class_exists( __NAMESPACE__ . '\\AdminNotice' ) ) {
 		public function show() {
 			$instance = self::getInstance();
 			$notices  = $instance->cookies;
-			
-			
+
+
 			if ( empty( $notices ) || ! is_array( $notices ) ) {
 				return;
 			}
@@ -94,7 +94,7 @@ if ( ! class_exists( __NAMESPACE__ . '\\AdminNotice' ) ) {
 							$message        = $notice['message'] ?? '';
 				$type           = $notice['type'] ?? 'info';
 				$is_dismissible_val = $notice['is_dismissible'] ?? false;
-				
+
 				$is_dismissible = $is_dismissible_val ? 'is-dismissible' : '';
 				$class          = 'notice notice-' . $type;
 				printf( '<div class="%1$s %2$s"><p>%3$s</p></div>', esc_attr( $class ), esc_attr( $is_dismissible ), esc_html( $message ) );

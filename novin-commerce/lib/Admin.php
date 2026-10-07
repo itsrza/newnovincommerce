@@ -10,7 +10,7 @@
  * @subpackage Novin_Commerce/admin
  */
 
-namespace MobinDev\Novin_Commerce;
+namespace Novinwp\Novin_Commerce;
 
 /**
  * The dashboard-specific functionality of the plugin.
@@ -20,7 +20,7 @@ namespace MobinDev\Novin_Commerce;
  *
  * @package    Novin_Commerce
  * @subpackage Novin_Commerce/admin
- * @author     Mohammad Hosein Mohaddes <mobin7332@gmail.com>
+ * @author     Novinwp <info@npwp.ir>
  */
 class Admin {
 

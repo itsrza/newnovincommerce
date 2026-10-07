@@ -1,10 +1,10 @@
 <?php
-namespace MobinDev\Novin_Commerce\Admin;
+namespace Novinwp\Novin_Commerce\Admin;
 
-use MobinDev\Novin_Commerce\Common\SettingAPI;
-use MobinDev\Novin_Commerce\Common\SyncLog;
-use MobinDev\Novin_Commerce\Common\Text_Encoding;
-use MobinDev\Novin_Commerce\Models\Sync;
+use Novinwp\Novin_Commerce\Common\SettingAPI;
+use Novinwp\Novin_Commerce\Common\SyncLog;
+use Novinwp\Novin_Commerce\Common\Text_Encoding;
+use Novinwp\Novin_Commerce\Models\Sync;
 
 class Connection_Dashboard {
     public static function render() {

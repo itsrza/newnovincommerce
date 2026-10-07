@@ -11,7 +11,7 @@ return array(
     'Symfony\\Contracts\\Translation\\' => array($vendorDir . '/symfony/translation-contracts'),
     'Symfony\\Component\\Translation\\' => array($vendorDir . '/symfony/translation'),
     'Morilog\\Jalali\\' => array($vendorDir . '/morilog/jalali/src'),
-    'MobinDev\\Novin_Commerce\\' => array($baseDir . '/lib'),
+    'Novinwp\\Novin_Commerce\\' => array($baseDir . '/lib'),
     'Carbon\\' => array($vendorDir . '/nesbot/carbon/src/Carbon'),
     'Assert\\' => array($vendorDir . '/beberlei/assert/lib/Assert'),
     'As247\\WpEloquent\\' => array(PHP_VERSION_ID >= 80100 ? $vendorDir . '/as247/wp-eloquent/src-php81' : $vendorDir . '/as247/wp-eloquent/src'),

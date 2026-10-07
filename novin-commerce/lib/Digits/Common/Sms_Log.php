@@ -1,8 +1,8 @@
 <?php
 
-namespace MobinDev\Novin_Commerce\Digits\Common;
+namespace Novinwp\Novin_Commerce\Digits\Common;
 
-use MobinDev\Novin_Commerce\Common\Text_Encoding;
+use Novinwp\Novin_Commerce\Common\Text_Encoding;
 
 /**
  * Records every SMS send attempt (OTP or otherwise) so the admin settings

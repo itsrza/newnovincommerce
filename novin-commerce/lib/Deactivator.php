@@ -10,7 +10,7 @@
  * @subpackage Novin_Commerce/includes
  */
 
-namespace MobinDev\Novin_Commerce;
+namespace Novinwp\Novin_Commerce;
 
 /**
  * Fired during plugin deactivation.
@@ -20,7 +20,7 @@ namespace MobinDev\Novin_Commerce;
  * @since      1.0.0
  * @package    Novin_Commerce
  * @subpackage Novin_Commerce/includes
- * @author     Mohammad Hosein Mohaddes <mobin7332@gmail.com>
+ * @author     Novinwp <info@npwp.ir>
  */
 class Deactivator {
 

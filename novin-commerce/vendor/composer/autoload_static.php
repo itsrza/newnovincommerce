@@ -27,7 +27,10 @@ class ComposerStaticInit48c20815689a25a3e0a42cf9938cfbcb
         'M' => 
         array (
             'Morilog\\Jalali\\' => 15,
-            'MobinDev\\Novin_Commerce\\' => 24,
+        ),
+        'N' =>
+        array (
+            'Novinwp\\Novin_Commerce\\' => 23,
         ),
         'C' => 
         array (
@@ -61,7 +64,7 @@ class ComposerStaticInit48c20815689a25a3e0a42cf9938cfbcb
         array (
             0 => __DIR__ . '/..' . '/morilog/jalali/src',
         ),
-        'MobinDev\\Novin_Commerce\\' => 
+        'Novinwp\\Novin_Commerce\\' =>
         array (
             0 => __DIR__ . '/../..' . '/lib',
         ),

@@ -53,8 +53,8 @@ class NovinCommerce_RolePrice_Admin_Fields {
 	}
 
 	private function to_display_price( $value ) {
-		if ( class_exists( '\\MobinDev\\Novin_Commerce\\Common\\Currency_Conversion' ) ) {
-			return \MobinDev\Novin_Commerce\Common\Currency_Conversion::to_display( $value );
+		if ( class_exists( '\\Novinwp\\Novin_Commerce\\Common\\Currency_Conversion' ) ) {
+			return \Novinwp\Novin_Commerce\Common\Currency_Conversion::to_display( $value );
 		}
 		return $value;
 	}
@@ -168,8 +168,8 @@ class NovinCommerce_RolePrice_Admin_Fields {
 			return '';
 		}
 
-		if ( class_exists( '\\MobinDev\\Novin_Commerce\\Common\\Currency_Conversion' ) ) {
-			$formatted = \MobinDev\Novin_Commerce\Common\Currency_Conversion::to_storage( $formatted );
+		if ( class_exists( '\\Novinwp\\Novin_Commerce\\Common\\Currency_Conversion' ) ) {
+			$formatted = \Novinwp\Novin_Commerce\Common\Currency_Conversion::to_storage( $formatted );
 		}
 
 		return $formatted;

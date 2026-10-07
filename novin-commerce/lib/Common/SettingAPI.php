@@ -1,7 +1,7 @@
 <?php
 
 
-namespace MobinDev\Novin_Commerce\Common;
+namespace Novinwp\Novin_Commerce\Common;
 
 
 class SettingAPI
@@ -79,8 +79,8 @@ class SettingAPI
 	public static function getSecret($name, $default = '')
 	{
 		$value = self::get($name, $default);
-		if (class_exists('\\MobinDev\\Novin_Commerce\\Digits\\Common\\Secret_Crypt')) {
-			$decrypted = \MobinDev\Novin_Commerce\Digits\Common\Secret_Crypt::decrypt((string) $value);
+		if (class_exists('\\Novinwp\\Novin_Commerce\\Digits\\Common\\Secret_Crypt')) {
+			$decrypted = \Novinwp\Novin_Commerce\Digits\Common\Secret_Crypt::decrypt((string) $value);
 			return '' === $decrypted && '' !== (string) $value ? $default : $decrypted;
 		}
 
@@ -96,8 +96,8 @@ class SettingAPI
 	 */
 	public static function setSecret($name, $value)
 	{
-		if (class_exists('\\MobinDev\\Novin_Commerce\\Digits\\Common\\Secret_Crypt')) {
-			$value = \MobinDev\Novin_Commerce\Digits\Common\Secret_Crypt::encrypt((string) $value);
+		if (class_exists('\\Novinwp\\Novin_Commerce\\Digits\\Common\\Secret_Crypt')) {
+			$value = \Novinwp\Novin_Commerce\Digits\Common\Secret_Crypt::encrypt((string) $value);
 		}
 
 		return self::set($name, $value);

@@ -1,9 +1,9 @@
 <?php
 
-namespace MobinDev\Novin_Commerce\Frontend;
+namespace Novinwp\Novin_Commerce\Frontend;
 
-use MobinDev\Novin_Commerce\Common\SettingAPI;
-use MobinDev\Novin_Commerce\Plugin;
+use Novinwp\Novin_Commerce\Common\SettingAPI;
+use Novinwp\Novin_Commerce\Plugin;
 
 class Shortcode {
 	/** @var Plugin */

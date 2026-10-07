@@ -13,17 +13,17 @@
  * @subpackage Novin_Commerce/includes
  */
 
-namespace MobinDev\Novin_Commerce;
+namespace Novinwp\Novin_Commerce;
 
 use As247\WpEloquent\Application;
-use MobinDev\Novin_Commerce\Admin\AdminNotice;
-use MobinDev\Novin_Commerce\Admin\Menu;
-use MobinDev\Novin_Commerce\Common\Currency_Conversion;
-use MobinDev\Novin_Commerce\Common\Woocommerce;
-use MobinDev\Novin_Commerce\Common\Sync;
-use MobinDev\Novin_Commerce\Digits\Digits_Module;
-use MobinDev\Novin_Commerce\Frontend\Shortcode;
-use MobinDev\Novin_Commerce\Frontend\Woocommerce_Menu;
+use Novinwp\Novin_Commerce\Admin\AdminNotice;
+use Novinwp\Novin_Commerce\Admin\Menu;
+use Novinwp\Novin_Commerce\Common\Currency_Conversion;
+use Novinwp\Novin_Commerce\Common\Woocommerce;
+use Novinwp\Novin_Commerce\Common\Sync;
+use Novinwp\Novin_Commerce\Digits\Digits_Module;
+use Novinwp\Novin_Commerce\Frontend\Shortcode;
+use Novinwp\Novin_Commerce\Frontend\Woocommerce_Menu;
 
 /**
  * The core plugin class.
@@ -37,7 +37,7 @@ use MobinDev\Novin_Commerce\Frontend\Woocommerce_Menu;
  * @since      1.0.0
  * @package    Novin_Commerce
  * @subpackage Novin_Commerce/includes
- * @author     Mohammad Hosein Mohaddes <mobin7332@gmail.com>
+ * @author     Novinwp <info@npwp.ir>
  */
 class Plugin {
 
@@ -67,7 +67,7 @@ class Plugin {
 	 * @access   protected
 	 * @var      string $version The current version of the plugin.
 	 */
-	protected $version = '1.19.0';
+	protected $version = '1.20.0';
 
 	/**
 	 * Define the core functionality of the plugin.
@@ -145,7 +145,7 @@ class Plugin {
 			// callback runs at the final priority, after any role price has
 			// been selected, so role prices are divided exactly once.
 			Currency_Conversion::boot();
-			\MobinDev\Novin_Commerce\RolePrice\Bootstrap::boot();
+			\Novinwp\Novin_Commerce\RolePrice\Bootstrap::boot();
 		}
 
 	}
@@ -202,9 +202,9 @@ class Plugin {
 
 
 	public function getPluginFile() {
-		$mobin = \plugin_dir_path( dirname( __FILE__ ) ) . 'novin-commerce.php';
+		$novin = \plugin_dir_path( dirname( __FILE__ ) ) . 'novin-commerce.php';
 
-		return $mobin;
+		return $novin;
 	}
 
 	public function getAdminScriptUrl() {

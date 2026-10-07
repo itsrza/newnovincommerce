@@ -1,6 +1,6 @@
 <?php
 
-namespace MobinDev\Novin_Commerce\Admin;
+namespace Novinwp\Novin_Commerce\Admin;
 
 class Category_List_Table extends List_Table {
 	protected $name = 'category';

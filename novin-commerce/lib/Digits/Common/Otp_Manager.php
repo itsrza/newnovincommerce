@@ -1,8 +1,8 @@
 <?php
 
-namespace MobinDev\Novin_Commerce\Digits\Common;
+namespace Novinwp\Novin_Commerce\Digits\Common;
 
-use MobinDev\Novin_Commerce\Digits\SmsGateways\Gateway_Registry;
+use Novinwp\Novin_Commerce\Digits\SmsGateways\Gateway_Registry;
 
 /**
  * Handles OTP lifecycle: generate + send, verify, and the rate-limiting

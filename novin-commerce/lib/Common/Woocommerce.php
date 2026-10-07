@@ -1,8 +1,8 @@
 <?php
 
-namespace MobinDev\Novin_Commerce\Common;
+namespace Novinwp\Novin_Commerce\Common;
 
-use MobinDev\Novin_Commerce\Plugin;
+use Novinwp\Novin_Commerce\Plugin;
 
 class Woocommerce
 {

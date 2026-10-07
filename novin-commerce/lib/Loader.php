@@ -10,7 +10,7 @@
  * @subpackage Novin_Commerce/includes
  */
 
-namespace MobinDev\Novin_Commerce;
+namespace Novinwp\Novin_Commerce;
 
 /**
  * Register all actions and filters for the plugin.
@@ -21,7 +21,7 @@ namespace MobinDev\Novin_Commerce;
  *
  * @package    Novin_Commerce
  * @subpackage Novin_Commerce/includes
- * @author     Mohammad Hosein Mohaddes <mobin7332@gmail.com>
+ * @author     Novinwp <info@npwp.ir>
  */
 class Loader {
 

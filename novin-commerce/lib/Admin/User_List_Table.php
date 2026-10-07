@@ -1,8 +1,8 @@
 <?php
 
-namespace MobinDev\Novin_Commerce\Admin;
+namespace Novinwp\Novin_Commerce\Admin;
 
-use MobinDev\Novin_Commerce\Common\Text_Encoding;
+use Novinwp\Novin_Commerce\Common\Text_Encoding;
 use Morilog\Jalali\Jalalian;
 
 class User_List_Table extends List_Table {

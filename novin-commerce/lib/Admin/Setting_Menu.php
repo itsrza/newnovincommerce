@@ -1,10 +1,10 @@
 <?php
 
-namespace MobinDev\Novin_Commerce\Admin;
+namespace Novinwp\Novin_Commerce\Admin;
 
-use MobinDev\Novin_Commerce\Common\Currency_Conversion;
-use MobinDev\Novin_Commerce\Common\SettingAPI;
-use MobinDev\Novin_Commerce\Plugin;
+use Novinwp\Novin_Commerce\Common\Currency_Conversion;
+use Novinwp\Novin_Commerce\Common\SettingAPI;
+use Novinwp\Novin_Commerce\Plugin;
 
 class Setting_Menu {
 	private $plugin;

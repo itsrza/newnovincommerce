@@ -1,6 +1,6 @@
 <?php
 
-namespace MobinDev\Novin_Commerce\Digits\Common;
+namespace Novinwp\Novin_Commerce\Digits\Common;
 
 /**
  * Small helper for encrypting/decrypting sensitive settings values

@@ -1,6 +1,6 @@
 <?php
 
-namespace MobinDev\Novin_Commerce\Common;
+namespace Novinwp\Novin_Commerce\Common;
 
 /**
  * Small UTF-8 boundary helper for values coming from accounting/SMS APIs.

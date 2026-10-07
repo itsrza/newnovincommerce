@@ -1,6 +1,6 @@
 <?php
 
-namespace MobinDev\Novin_Commerce\RolePrice;
+namespace Novinwp\Novin_Commerce\RolePrice;
 
 if ( ! defined( 'ABSPATH' ) ) {
     exit;
@@ -20,8 +20,8 @@ final class Bootstrap {
         // WCPBR_VERSION; imported products still need this module's fields
         // and Festi-compatible price reader.
         self::$booted = true;
-        if ( class_exists( '\\MobinDev\\Novin_Commerce\\Common\\Currency_Conversion' ) ) {
-            \MobinDev\Novin_Commerce\Common\Currency_Conversion::boot();
+        if ( class_exists( '\\Novinwp\\Novin_Commerce\\Common\\Currency_Conversion' ) ) {
+            \Novinwp\Novin_Commerce\Common\Currency_Conversion::boot();
         }
 
         $files = array(

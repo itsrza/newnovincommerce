@@ -1,6 +1,6 @@
 <?php
 
-namespace MobinDev\Novin_Commerce\Digits\Common;
+namespace Novinwp\Novin_Commerce\Digits\Common;
 
 use As247\WpEloquent\Application;
 use As247\WpEloquent\Database\Schema\Blueprint;

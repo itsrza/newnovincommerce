@@ -1,7 +1,7 @@
 <?php
-namespace MobinDev\Novin_Commerce\Admin;
+namespace Novinwp\Novin_Commerce\Admin;
 
-use MobinDev\Novin_Commerce\Models\Sync;
+use Novinwp\Novin_Commerce\Models\Sync;
 
 /**
  * Dedicated, lightweight queue table.

@@ -6,7 +6,7 @@
         'install_path' => __DIR__ . '/../../',
         'aliases' => array(),
         'reference' => NULL,
-        'name' => 'mobindev/novin-commerce',
+        'name' => 'novinwp/novin-commerce',
         'dev' => true,
     ),
     'versions' => array(
@@ -28,7 +28,7 @@
             'reference' => 'cb70015c04be1baee6f5f5c953703347c0ac1655',
             'dev_requirement' => false,
         ),
-        'mobindev/novin-commerce' => array(
+        'novinwp/novin-commerce' => array(
             'pretty_version' => '1.0.0+no-version-set',
             'version' => '1.0.0.0',
             'type' => 'wordpress-plugin',

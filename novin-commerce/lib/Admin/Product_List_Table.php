@@ -1,6 +1,6 @@
 <?php
 
-namespace MobinDev\Novin_Commerce\Admin;
+namespace Novinwp\Novin_Commerce\Admin;
 
 /**
  * Optimized WooCommerce product/variation list for Novin Commerce.

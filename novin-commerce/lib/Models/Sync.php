@@ -1,9 +1,9 @@
 <?php
 
-namespace MobinDev\Novin_Commerce\Models;
+namespace Novinwp\Novin_Commerce\Models;
 
 use As247\WpEloquent\Database\Eloquent\Model;
-use MobinDev\Novin_Commerce\Common\SyncLog;
+use Novinwp\Novin_Commerce\Common\SyncLog;
 
 class Sync extends Model {
 	protected $table = 'novin_commerce_syncs';

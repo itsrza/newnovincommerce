@@ -1,13 +1,13 @@
 <?php
 
-namespace MobinDev\Novin_Commerce\Digits\Admin;
+namespace Novinwp\Novin_Commerce\Digits\Admin;
 
-use MobinDev\Novin_Commerce\Digits\Common\Digits_Settings;
-use MobinDev\Novin_Commerce\Digits\Common\Otp_Manager;
-use MobinDev\Novin_Commerce\Digits\Common\Sms_Log;
-use MobinDev\Novin_Commerce\Digits\SmsGateways\Gateway_Registry;
-use MobinDev\Novin_Commerce\Common\Text_Encoding;
-use MobinDev\Novin_Commerce\Plugin;
+use Novinwp\Novin_Commerce\Digits\Common\Digits_Settings;
+use Novinwp\Novin_Commerce\Digits\Common\Otp_Manager;
+use Novinwp\Novin_Commerce\Digits\Common\Sms_Log;
+use Novinwp\Novin_Commerce\Digits\SmsGateways\Gateway_Registry;
+use Novinwp\Novin_Commerce\Common\Text_Encoding;
+use Novinwp\Novin_Commerce\Plugin;
 
 /**
  * Settings page for the Digits (mobile signup/login) module.
@@ -36,11 +36,12 @@ class Digits_Setting_Menu {
 	public function add_menu() {
 		add_submenu_page(
 			'novin-commerce-products',
-			'ورود/ثبت‌نام موبایلی (Digits)',
-			'ورود/ثبت‌نام موبایلی',
+			'ورود / ثبت نام موبایلی',
+			'ورود / ثبت نام',
 			'manage_options',
 			'novin-commerce-digits',
-			[ $this, 'output' ]
+			[ $this, 'output' ],
+			'65'
 		);
 	}
 
@@ -61,7 +62,7 @@ class Digits_Setting_Menu {
 			$this->save_general_tab( false );
 			$this->save_sms_tab( false );
 			$this->save_woocommerce_tab( false );
-			\MobinDev\Novin_Commerce\Admin\AdminNotice::addSuccessDismissible( 'تنظیمات ذخیره شد.', 2 );
+			\Novinwp\Novin_Commerce\Admin\AdminNotice::addSuccessDismissible( 'تنظیمات ذخیره شد.', 2 );
 		}
 
 		wp_safe_redirect( add_query_arg( 'tab', in_array( $tab, [ 'general', 'sms', 'woocommerce', 'logs' ], true ) ? $tab : 'general', admin_url( 'admin.php?page=novin-commerce-digits' ) ) );
@@ -107,7 +108,7 @@ class Digits_Setting_Menu {
 		}
 
 		if ( $show_notice ) {
-			\MobinDev\Novin_Commerce\Admin\AdminNotice::addSuccessDismissible( 'تنظیمات عمومی ذخیره شد.', 2 );
+			\Novinwp\Novin_Commerce\Admin\AdminNotice::addSuccessDismissible( 'تنظیمات عمومی ذخیره شد.', 2 );
 		}
 	}
 
@@ -153,7 +154,7 @@ class Digits_Setting_Menu {
 		}
 
 		if ( $show_notice ) {
-			\MobinDev\Novin_Commerce\Admin\AdminNotice::addSuccessDismissible( 'تنظیمات پیامک ذخیره شد.', 2 );
+			\Novinwp\Novin_Commerce\Admin\AdminNotice::addSuccessDismissible( 'تنظیمات پیامک ذخیره شد.', 2 );
 		}
 	}
 
@@ -169,7 +170,7 @@ class Digits_Setting_Menu {
 		}
 
 		if ( $show_notice ) {
-			\MobinDev\Novin_Commerce\Admin\AdminNotice::addSuccessDismissible( 'تنظیمات ووکامرس ذخیره شد.', 2 );
+			\Novinwp\Novin_Commerce\Admin\AdminNotice::addSuccessDismissible( 'تنظیمات ووکامرس ذخیره شد.', 2 );
 		}
 	}
 
@@ -199,7 +200,7 @@ class Digits_Setting_Menu {
 
 		$result = $gateway->send( $phone, $message, $settings );
 
-		\MobinDev\Novin_Commerce\Digits\Common\Sms_Log::add(
+		\Novinwp\Novin_Commerce\Digits\Common\Sms_Log::add(
 			$gateway_slug,
 			$phone,
 			$result['success'] ? 'success' : 'error',
