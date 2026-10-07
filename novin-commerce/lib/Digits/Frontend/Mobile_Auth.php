@@ -35,6 +35,11 @@ class Mobile_Auth {
 		add_action( 'login_enqueue_scripts', [ $this, 'enqueue_login_assets' ] );
 		add_filter( 'login_body_class', [ $this, 'login_body_class' ] );
 		add_filter( 'login_message', [ $this, 'login_message' ] );
+		// Some themes replace the WooCommerce account template with a block or
+		// a custom page builder. In that case the two WooCommerce form actions
+		// below are never fired; the content fallback keeps the account URL a
+		// usable login/register page instead of showing an unrelated cart.
+		add_filter( 'the_content', [ $this, 'replace_account_login_content' ], 999 );
 
 		// The WooCommerce template renders its default forms between these two
 		// actions. Buffer that output and replace it only when the module is on.
@@ -129,6 +134,35 @@ class Mobile_Auth {
 
 		$redirect_to = function_exists( 'wc_get_page_permalink' ) ? wc_get_page_permalink( 'myaccount' ) : '';
 		echo $this->render_form( 'woocommerce', $redirect_to ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped
+	}
+
+	/**
+	 * Fallback for block-based/custom My Account pages.
+	 *
+	 * Older themes use the classic WooCommerce template and are handled by the
+	 * before/after actions above. Newer themes can render a block or even leave
+	 * a cart shortcode on the page; in that case the visitor sees the empty-cart
+	 * message and never gets a login form. Only replace the content of the
+	 * configured My Account page for logged-out visitors, and leave all logged-
+	 * in account content (including a real cart) untouched.
+	 *
+	 * @param string $content Rendered page content.
+	 * @return string
+	 */
+	public function replace_account_login_content( $content ) {
+		if ( ! $this->is_enabled() || is_admin() || is_user_logged_in() || ! is_main_query() || ! in_the_loop() ) {
+			return $content;
+		}
+		if ( ! function_exists( 'is_account_page' ) || ! is_account_page() ) {
+			return $content;
+		}
+		// The classic WooCommerce hooks may already have inserted the form.
+		if ( false !== strpos( (string) $content, 'novin-digits-auth' ) ) {
+			return $content;
+		}
+
+		$redirect_to = function_exists( 'wc_get_page_permalink' ) ? wc_get_page_permalink( 'myaccount' ) : get_permalink();
+		return $this->render_form( 'woocommerce-fallback', $redirect_to );
 	}
 
 	public function ajax_request_otp() {
