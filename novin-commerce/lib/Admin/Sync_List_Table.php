@@ -65,8 +65,8 @@ class Sync_List_Table extends \WP_List_Table {
                 return $id . $this->row_actions( $actions );
             case 'item_id': return absint( $item['item_id'] ?? 0 );
             case 'item_type':
-                $labels = ['product'=>'کالای اصلی','variation'=>'Variation','order'=>'فاکتور','category'=>'دسته‌بندی','user'=>'شخص'];
-                return esc_html( $labels[ $item['item_type'] ?? '' ] ?? (string)($item['item_type'] ?? '—') );
+                $labels = array( 'product' => 'کالای اصلی', 'variation' => 'تنوع متغیر', 'order' => 'فاکتور', 'category' => 'دسته‌بندی', 'user' => 'شخص' );
+                return esc_html( $labels[ $item['item_type'] ?? '' ] ?? 'مورد تبادل' );
             case 'priority':
                 $priority = (int)($item['priority'] ?? 0);
                 return $priority > 0 ? '<strong class="novin-sync-priority-high">بالا (' . $priority . ')</strong>' : '<span>عادی</span>';
@@ -90,7 +90,7 @@ class Sync_List_Table extends \WP_List_Table {
         $item_id   = absint( $_GET['item_id'] );
         $item_type = sanitize_key( wp_unslash( $_GET['item_type'] ) );
         check_admin_referer( 'novin-sync-row-delete_' . $item_id . '_' . $item_type );
-        if ( ! current_user_can( 'manage_options' ) ) wp_die( esc_html__( 'دسترسی غیرمجاز.', 'novin-commerce' ) );
+        if ( ! current_user_can( 'manage_woocommerce' ) ) wp_die( esc_html__( 'دسترسی غیرمجاز.', 'novin-commerce' ) );
         if ( Sync::removeItem( $item_id, $item_type ) ) {
             AdminNotice::addSuccessDismissible( 'مورد از صف تبادل حذف شد.' );
         }
@@ -104,7 +104,7 @@ class Sync_List_Table extends \WP_List_Table {
         $action  = $action ?: $action2;
         if ( 'delete' !== $action || empty( $_REQUEST['sync_items'] ) || ! is_array( $_REQUEST['sync_items'] ) ) return;
         check_admin_referer( 'bulk-' . $this->_args['plural'] );
-        if ( ! current_user_can( 'manage_options' ) ) wp_die( esc_html__( 'دسترسی غیرمجاز.', 'novin-commerce' ) );
+        if ( ! current_user_can( 'manage_woocommerce' ) ) wp_die( esc_html__( 'دسترسی غیرمجاز.', 'novin-commerce' ) );
         $done = 0;
         foreach ( wp_unslash( $_REQUEST['sync_items'] ) as $value ) {
             $parts = explode( ':', (string) $value );

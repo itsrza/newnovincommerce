@@ -5,99 +5,83 @@ namespace MobinDev\Novin_Commerce\Admin;
 class Category_List_Table extends List_Table {
 	protected $name = 'category';
 
-// just the barebone implementation.
 	public function get_columns() {
-		return [
+		return array(
 			'cb'        => '<input type="checkbox" />',
 			'name'      => 'نام دسته‌بندی',
 			'slug'      => 'نامک',
-			'quantity'  => 'تعداد',
-			'id'        => 'ID',
-			'guid'      => 'GUID',
+			'quantity'  => 'تعداد کالا',
+			'id'        => 'شناسه',
+			'guid'      => 'شناسه حسابداری',
 			'sync_date' => 'زمان همگام‌سازی',
-		];
+		);
 	}
 
 	/**
 	 * @param \WP_Term $item
-	 * @param string $column_name
-	 *
-	 * @return mixed|void
+	 * @param string   $column_name
+	 * @return mixed
 	 */
 	public function column_default( $item, $column_name ) {
 		switch ( $column_name ) {
 			case 'slug':
-				return urldecode( $item->slug );
-			case 'stock_quantity':
-				return $item->count;
+				return esc_html( urldecode( (string) $item->slug ) );
+			case 'quantity':
+				// WP_Term->count is populated by get_terms() and is the
+				// authoritative object count for this taxonomy term.
+				return number_format_i18n( (int) $item->count );
 			case 'id':
-				return $item->term_id;
-
+				return absint( $item->term_id );
+			case 'guid':
+				return esc_html( (string) $this->getGUID( $item ) );
+			case 'sync_date':
+				return esc_html( (string) $this->getSyncDate( $item ) );
 		}
-	}
 
+		return '';
+	}
 
 	public function get_sortable_columns() {
-		return [
+		return array(
 			'id'        => array( 'id', true ),
-			'name'      => 'name',
-			'slug'      => 'slug',
-			'quantity'  => 'quantity',
-			'guid'      => 'guid',
-			'sync_date' => 'sync_date',
-
-		];
+			'name'      => array( 'name', false ),
+			'slug'      => array( 'slug', false ),
+			'quantity'  => array( 'quantity', false ),
+			'guid'      => array( 'guid', false ),
+			'sync_date' => array( 'sync_date', false ),
+		);
 	}
 
 	/**
-	 * @return int[]|string|string[]|\WP_Error|\WP_Term[]
+	 * @return \WP_Error|\WP_Term[]
 	 */
 	public function fetchTableData() {
-		$query_args = [];
-		$search     = isset( $_REQUEST['s'] ) ? wp_unslash( trim( $_REQUEST['s'] ) ) : null;
+		$search = isset( $_REQUEST['s'] ) ? sanitize_text_field( wp_unslash( trim( (string) $_REQUEST['s'] ) ) ) : '';
 
-		return get_terms( [
-			'taxonomy'   => 'product_cat',
-			'hide_empty' => false,
-			'search'     => $search,
-			'count'=>true,
-		] );
+		$terms = get_terms(
+			array(
+				'taxonomy'   => 'product_cat',
+				'hide_empty' => false,
+				'search'     => $search,
+			)
+		);
 
+		return is_wp_error( $terms ) ? array() : $terms;
 	}
 
-	/**
-	 * @param \WP_Term $item
-	 *
-	 * @return string
-	 */
-	function getName( $item ) {
+	public function getName( $item ) {
 		return $item->name;
 	}
 
-	/**
-	 * @param \WP_Term $item
-	 *
-	 * @return string|null
-	 */
-	function getSyncDate( $item ) {
-		return get_term_meta( $item->term_id, '_np-api-sync-date',true );
+	public function getSyncDate( $item ) {
+		return get_term_meta( $item->term_id, '_np-api-sync-date', true );
 	}
 
-	/**
-	 * @param \WP_Term $item
-	 *
-	 * @return int
-	 */
-	function getID( $item ) {
+	public function getID( $item ) {
 		return $item->term_id;
 	}
 
-	/**
-	 * @param \WP_Term $item
-	 *
-	 * @return string|null
-	 */
-	function getGUID( $item ) {
-		return get_term_meta( $item->term_id, 'guid' ,true);
+	public function getGUID( $item ) {
+		return get_term_meta( $item->term_id, 'guid', true );
 	}
 }

@@ -69,10 +69,8 @@ class Item_Menu {
 			}
 		}
 
-		// ✅ جستجو داخل همین فرم تا guid_filter و bulk actions حفظ شوند
-		if ( $this->search ) {
-			$this->item_list_table->search_box( __( "جستجوی {$this->singular}", $this->plugin->get_plugin_name() ), $this->name );
-		}
+		// The single search input is rendered by extra_tablenav() beside the
+		// filters; do not add WP_List_Table's second search box here.
 
 		// جدول نهایی (فیلترها، اکشن‌ها، pagination و ...)
 		$this->item_list_table->display();

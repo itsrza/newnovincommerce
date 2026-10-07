@@ -9,6 +9,14 @@ use Morilog\Jalali\Jalalian;
 abstract class List_Table extends \WP_List_Table {
 	protected $name;
 	protected $syncs;
+	/**
+	 * Child tables may fetch an already-paginated data set (for example the
+	 * WooCommerce product table). When this is null, the base class paginates
+	 * the complete data set in memory as before.
+	 *
+	 * @var int|null
+	 */
+	protected $total_items = null;
 
 	public function __construct() {
 		parent::__construct([
@@ -52,9 +60,6 @@ abstract class List_Table extends \WP_List_Table {
     );
 
 		$actions = [];
-		if ( in_array( $this->getItemType( $item ), [ 'product', 'variation' ], true ) ) {
-			$actions['detail'] = sprintf('<a href="%s">جزئیات اتصال</a>', esc_url( add_query_arg([ 'page' => 'novin-commerce-dashboard', 'item_id' => absint( $this->getID( $item ) ), 'item_type' => $this->getItemType( $item ) ], admin_url( 'admin.php' ) ) ));
-		}
 		$actions['sync'] = sprintf('<a href="%s">همگام‌سازی</a>', esc_url(add_query_arg([
 				'page'     => wp_unslash($_REQUEST['page']),
 				'action'   => 'sync',
@@ -79,11 +84,11 @@ abstract class List_Table extends \WP_List_Table {
         if ( method_exists( $this, 'getSourceGUID' ) ) {
             $source_guid = trim( (string) $this->getSourceGUID( $item ) );
             if ( $source_guid && $source_guid !== (string) $guid ) {
-                $output .= '<br><small style="color:#b45309;">GUID حسابداری: <code>' . esc_html( $source_guid ) . '</code></small>';
+                $output .= '<br><small style="color:#b45309;">شناسه حسابداری: <code>' . esc_html( $source_guid ) . '</code></small>';
             }
         }
     } else {
-        $output .= "<span class='no-guid'>GUID موجود نیست</span>";
+        $output .= "<span class='no-guid'>شناسه حسابداری موجود نیست</span>";
     }
 
     // برچسب حذف در صورت داشتن guid
@@ -125,12 +130,12 @@ abstract class List_Table extends \WP_List_Table {
         'cb'             => '<input type="checkbox" />',
         'name'           => 'نام محصول',
         'slug'           => 'Slug',          // ✅ اضافه شد
-        'sku'            => 'SKU',           // ✅ اضافه شد
+        'sku'            => 'شناسه کالا',     // ✅ اضافه شد
         'category'       => 'دسته‌بندی',
         'price'          => 'قیمت',
         'stock_quantity' => 'موجودی',
-        'id'             => 'ID',
-        'guid'           => 'GUID',
+        'id'             => 'شناسه',
+        'guid'           => 'شناسه حسابداری',
         'sync_date'      => 'زمان همگام‌سازی',
     ];
 }
@@ -169,8 +174,8 @@ function extra_tablenav($which) {
         if ( 'product' === $this->name ) {
             $type_filter = isset($_REQUEST['type_filter']) ? sanitize_key(wp_unslash($_REQUEST['type_filter'])) : 'all';
             $sync_filter = isset($_REQUEST['sync_filter']) ? sanitize_key(wp_unslash($_REQUEST['sync_filter'])) : 'all';
-            echo '<select name="type_filter"><option value="all">همه نوع‌ها</option><option value="product"'.selected($type_filter,'product',false).'>کالای اصلی</option><option value="variation"'.selected($type_filter,'variation',false).'>Variation</option></select>';
-            echo '<select name="sync_filter"><option value="all">همه وضعیت‌ها</option><option value="synced"'.selected($sync_filter,'synced',false).'>همگام‌شده</option><option value="pending"'.selected($sync_filter,'pending',false).'>بدون زمان Sync</option></select>';
+            echo '<select name="type_filter"><option value="all">همه نوع‌ها</option><option value="product"'.selected($type_filter,'product',false).'>کالای اصلی</option><option value="variation"'.selected($type_filter,'variation',false).'>تنوع متغیر</option></select>';
+            echo '<select name="sync_filter"><option value="all">همه وضعیت‌ها</option><option value="synced"'.selected($sync_filter,'synced',false).'>همگام‌شده</option><option value="pending"'.selected($sync_filter,'pending',false).'>بدون زمان همگام‌سازی</option></select>';
         }
         echo '<select id="guid_filter" name="guid_filter">';
         echo '<option value="all"' . selected($current_filter, 'all', false) . '>همه اقلام</option>';
@@ -179,7 +184,7 @@ function extra_tablenav($which) {
         echo '</select>';
 
         // جستجو — حالا داخل همین فرم
-        echo '<input type="search" name="s" value="' . $search_value . '" placeholder="نام، SKU یا GUID..." />';
+        echo '<input type="search" name="s" value="' . $search_value . '" placeholder="نام، شناسه کالا یا شناسه حسابداری..." />';
         submit_button('اعمال', '', 'filter_action', false);
         echo '</div>';
 
@@ -221,30 +226,10 @@ function extra_tablenav($which) {
 	}
 
 		public function search_box($text, $input_id) {
-    if (empty($_REQUEST['s']) && !$this->has_items()) {
-        return;
-    }
-
-    $input_id = $input_id . '-search-input';
-
-    if (!empty($_REQUEST['orderby'])) {
-        echo '<input type="hidden" name="orderby" value="' . esc_attr($_REQUEST['orderby']) . '" />';
-    }
-    if (!empty($_REQUEST['order'])) {
-        echo '<input type="hidden" name="order" value="' . esc_attr($_REQUEST['order']) . '" />';
-    }
-    if (!empty($_REQUEST['type_filter'])) { echo '<input type="hidden" name="type_filter" value="' . esc_attr($_REQUEST['type_filter']) . '" />'; }
-    if (!empty($_REQUEST['sync_filter'])) { echo '<input type="hidden" name="sync_filter" value="' . esc_attr($_REQUEST['sync_filter']) . '" />'; }
-    if (!empty($_REQUEST['guid_filter'])) {
-        echo '<input type="hidden" name="guid_filter" value="' . esc_attr($_REQUEST['guid_filter']) . '" />';
-    }
-
-    echo '<p class="search-box">';
-    echo '<label class="screen-reader-text" for="' . esc_attr($input_id) . '">' . esc_html($text) . ':</label>';
-    echo '<input type="search" id="' . esc_attr($input_id) . '" name="s" value="' . esc_attr($_REQUEST['s'] ?? '') . '" />';
-    submit_button(esc_attr($text), '', '', false, ['id' => 'search-submit']);
-    echo '</p>';
-}
+			// The useful search field is rendered beside the filters in
+			// extra_tablenav(). Do not render WP_List_Table's second search box.
+			return;
+		}
 
 	// هسته‌ی جدول: آماده‌سازی داده‌ها
 	final function prepare_items() {
@@ -258,8 +243,12 @@ function extra_tablenav($which) {
 		$sortable = $this->get_sortable_columns();
 		$this->_column_headers = [$columns, $hidden, $sortable];
 
-		// داده‌ها از تابع فرزند
+		// داده‌ها از تابع فرزند. A child may set total_items when the query
+		// already applied LIMIT/OFFSET; reset it first so a previous request
+		// cannot accidentally leak pagination state into this request.
+		$this->total_items = null;
 		$data = $this->fetchTableData() ?? [];
+		$child_paginated = null !== $this->total_items;
 
 		// Load sync records only for rows visible on this page.
 		$this->syncs = new Collection();
@@ -279,39 +268,47 @@ function extra_tablenav($which) {
 			}
 		}
 
-		// مرتب‌سازی
-		$orderby = $_REQUEST['orderby'] ?? 'name';
-		$order   = $_REQUEST['order'] ?? 'asc';
+			// Non-paginated child tables are still sorted in memory. A child
+			// that already applied SQL ORDER BY/LIMIT/OFFSET must keep that
+			// global order; sorting only its current page would be incorrect.
+			if ( ! $child_paginated ) {
+				$orderby = $_REQUEST['orderby'] ?? 'name';
+				$order   = $_REQUEST['order'] ?? 'asc';
 
-		usort($data, function ($a, $b) use ($orderby, $order) {
-			switch ($orderby) {
-				case 'guid':
-					$valA = $this->getGUID($a);
-					$valB = $this->getGUID($b);
-					break;
-				case 'sync_date':
-					$valA = $this->getSyncDate($a);
-					$valB = $this->getSyncDate($b);
-					break;
-				case 'name':
-				default:
-					$valA = $this->getName($a);
-					$valB = $this->getName($b);
-					break;
+				usort($data, function ($a, $b) use ($orderby, $order) {
+					switch ($orderby) {
+						case 'guid':
+							$valA = $this->getGUID($a);
+							$valB = $this->getGUID($b);
+							break;
+						case 'sync_date':
+							$valA = $this->getSyncDate($a);
+							$valB = $this->getSyncDate($b);
+							break;
+						case 'name':
+						default:
+							$valA = $this->getName($a);
+							$valB = $this->getName($b);
+							break;
+					}
+					return ($order === 'asc') ? strcmp($valA, $valB) : strcmp($valB, $valA);
+				});
 			}
-			return ($order === 'asc') ? strcmp($valA, $valB) : strcmp($valB, $valA);
-		});
 
 		// pagination
 		$per_page     = $this->get_items_per_page('per_page', 20);
 		$current_page = $this->get_pagenum();
-		$total_items  = count($data);
+		$total_items  = null !== $this->total_items ? (int) $this->total_items : count($data);
 
-		$this->items = array_slice($data, (($current_page - 1) * $per_page), $per_page);
+		// Product_List_Table already applied LIMIT/OFFSET in SQL. Applying a
+		// second slice would empty every page after the first one.
+		$this->items = $child_paginated
+			? $data
+			: array_slice($data, (($current_page - 1) * $per_page), $per_page);
 		$this->set_pagination_args([
 			'total_items' => $total_items,
 			'per_page'    => $per_page,
-			'total_pages' => ceil($total_items / $per_page),
+			'total_pages' => $total_items > 0 ? (int) ceil($total_items / $per_page) : 0,
 		]);
 	}
 
@@ -327,6 +324,9 @@ function extra_tablenav($which) {
 		$action = $action ?: $action2;
 		if ( ! in_array( $action, [ 'sync', 'requeue', 'disconnect' ], true ) ) return;
 		if ( ! check_admin_referer( 'bulk-' . $this->_args['plural'] ) ) return;
+		if ( ! current_user_can( 'manage_woocommerce' ) ) {
+			wp_die( esc_html__( 'دسترسی غیرمجاز.', 'novin-commerce' ) );
+		}
 
 		$items = [];
 		foreach ( [ 'product', 'variation', 'order', 'category', 'user' ] as $item_type ) {

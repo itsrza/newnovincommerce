@@ -10,17 +10,18 @@ namespace MobinDev\Novin_Commerce\Admin;
  */
 class Product_List_Table extends List_Table {
 	protected $name = 'product';
+	/** @var int|null Total rows returned by the SQL query before pagination. */
+	protected $total_items = null;
 
 	public function get_columns() {
 		return [
 			'cb'              => '<input type="checkbox" />',
 			'name'            => 'نام کالا',
 			'type'            => 'نوع',
-			'sku'             => 'SKU',
+			'sku'             => 'شناسه کالا',
 			'category'        => 'دسته‌بندی',
 			'price'           => 'قیمت',
 			'stock_quantity'  => 'موجودی',
-			'id'              => 'ID',
 			'accounting'      => 'وضعیت حسابداری',
 			'sync_date'       => 'زمان همگام‌سازی',
 		];
@@ -32,9 +33,12 @@ class Product_List_Table extends List_Table {
 				return $this->column_name_with_slug( $item );
 			case 'type':
 				if ( $item->is_type( 'variation' ) ) {
-					return '<span class="novin-product-type novin-product-variation">Variation</span>';
+					return '<span class="novin-product-type novin-product-variation">تنوع متغیر</span>';
 				}
-				return '<span class="novin-product-type">Product</span>';
+				if ( $item->is_type( 'variable' ) ) {
+					return '<span class="novin-product-type novin-product-variable">کالای متغیر</span>';
+				}
+				return '<span class="novin-product-type">کالای ساده</span>';
 			case 'sku':
 				return $this->column_sku( $item );
 			case 'category':
@@ -114,8 +118,9 @@ class Product_List_Table extends List_Table {
 			'sku'            => 'sku.meta_value',
 			'price'          => 'price.meta_value+0',
 			'stock_quantity' => 'stock.meta_value+0',
-			'guid'           => 'guid.meta_value',
-			'sync_date'      => 'sync.meta_value',
+				'guid'           => 'guid.meta_value',
+				'accounting'     => 'guid.meta_value',
+				'sync_date'      => 'sync.meta_value',
 		];
 		$order_by_sql = $allowed_orderby[ $orderby ] ?? 'p.post_title';
 
@@ -173,6 +178,7 @@ class Product_List_Table extends List_Table {
 
 		$count_sql = "SELECT COUNT(DISTINCT p.ID) FROM {$wpdb->posts} p {$join_sql} WHERE {$where_sql}";
 		$count     = (int) $wpdb->get_var( $wpdb->prepare( $count_sql, $args ) );
+		$this->total_items = $count;
 
 		$data_sql = "SELECT DISTINCT p.ID FROM {$wpdb->posts} p {$join_sql} WHERE {$where_sql} ORDER BY {$order_by_sql} {$order}, p.ID ASC LIMIT %d OFFSET %d";
 		$data_args = $args;
@@ -224,7 +230,7 @@ class Product_List_Table extends List_Table {
 					}
 					$parts[] = $label . ': ' . $value;
 				}
-				$name = $this->decode_value( $parent->get_name() ) . ( $parts ? ' — ' . implode( ', ', $parts ) : ' — Variation' );
+				$name = $this->decode_value( $parent->get_name() ) . ( $parts ? ' — ' . implode( ', ', $parts ) : ' — تنوع متغیر' );
 			}
 		}
 		return $name;

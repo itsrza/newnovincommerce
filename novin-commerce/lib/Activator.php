@@ -30,6 +30,8 @@ use MobinDev\Novin_Commerce\Common\SettingAPI;
  */
 class Activator {
 
+	const MAINTENANCE_HOOK = 'novin_commerce_daily_maintenance';
+
 	/**
 	 * Short Description. (use period)
 	 *
@@ -41,7 +43,8 @@ class Activator {
 		Application::bootWp();
 		self::createTables();
 		self::setSettings();
-		update_option( 'novin_commerce_schema_version', '4' );
+		self::scheduleMaintenance();
+		update_option( 'novin_commerce_schema_version', '5' );
 	}
 
 	public static function createTables() {
@@ -59,11 +62,14 @@ class Activator {
 
 		if ( Schema::hasTable( 'novin_commerce_syncs' ) ) {
 			try {
-				Schema::table( 'novin_commerce_syncs', function ( Blueprint $table ) {
-					$table->integer( 'priority' )->default( 0 );
-				} );
+				if ( ! Schema::hasColumn( 'novin_commerce_syncs', 'priority' ) ) {
+					Schema::table( 'novin_commerce_syncs', function ( Blueprint $table ) {
+						$table->integer( 'priority' )->default( 0 );
+					} );
+				}
 			} catch ( \Throwable $e ) {
-				// Column already exists on upgraded installations.
+				// A concurrent upgrade or an older schema adapter may report the
+				// column as unavailable. The next request can retry safely.
 			}
 		}
 
@@ -81,13 +87,60 @@ class Activator {
 				$table->index( [ 'status', 'created_at' ] );
 			} );
 		}
+
+		self::ensure_utf8_tables();
+	}
+
+	private static function ensure_utf8_tables() {
+		global $wpdb;
+		$charset = isset( $wpdb->charset ) && preg_match( '/^[a-z0-9_]+$/i', $wpdb->charset ) ? $wpdb->charset : 'utf8mb4';
+		$collate = isset( $wpdb->collate ) && preg_match( '/^[a-z0-9_]+$/i', $wpdb->collate ) ? $wpdb->collate : '';
+		foreach ( array( $wpdb->prefix . 'novin_commerce_sync_logs' ) as $table ) {
+			$sql = "ALTER TABLE {$table} CONVERT TO CHARACTER SET {$charset}";
+			if ( '' !== $collate ) {
+				$sql .= " COLLATE {$collate}";
+			}
+			$wpdb->query( $sql ); // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.PreparedSQL.NotPrepared -- identifiers are plugin-owned and charset values are allow-listed.
+		}
 	}
 
 	public static function maybeUpgrade() {
 		Application::bootWp();
-		if ( '4' !== (string) get_option( 'novin_commerce_schema_version', '' ) ) {
+		if ( '5' !== (string) get_option( 'novin_commerce_schema_version', '' ) ) {
 			self::createTables();
-			update_option( 'novin_commerce_schema_version', '4' );
+			update_option( 'novin_commerce_schema_version', '5' );
+		}
+		self::scheduleMaintenance();
+	}
+
+	public static function scheduleMaintenance() {
+		if ( ! wp_next_scheduled( self::MAINTENANCE_HOOK ) ) {
+			wp_schedule_event( time() + HOUR_IN_SECONDS, 'daily', self::MAINTENANCE_HOOK );
+		}
+	}
+
+	public static function unscheduleMaintenance() {
+		// Clear every copy in case an older release scheduled the hook more
+		// than once; deactivation must not leave a background maintenance job.
+		if ( function_exists( 'wp_clear_scheduled_hook' ) ) {
+			wp_clear_scheduled_hook( self::MAINTENANCE_HOOK );
+			return;
+		}
+		$timestamp = wp_next_scheduled( self::MAINTENANCE_HOOK );
+		if ( $timestamp ) {
+			wp_unschedule_event( $timestamp, self::MAINTENANCE_HOOK );
+		}
+	}
+
+	public static function run_maintenance() {
+		if ( class_exists( '\MobinDev\Novin_Commerce\Common\SyncLog' ) ) {
+			\MobinDev\Novin_Commerce\Common\SyncLog::prune( 30 );
+		}
+		if ( class_exists( '\MobinDev\Novin_Commerce\Digits\Common\Sms_Log' ) ) {
+			\MobinDev\Novin_Commerce\Digits\Common\Sms_Log::prune( 30 );
+		}
+		if ( class_exists( '\MobinDev\Novin_Commerce\Digits\Common\Otp_Manager' ) ) {
+			\MobinDev\Novin_Commerce\Digits\Common\Otp_Manager::prune( 2 );
 		}
 	}
 
@@ -97,6 +150,9 @@ class Activator {
 		}
 		if ( ! SettingAPI::get( 'api_url' ) ) {
 			SettingAPI::set( 'api_url', 'https://novinrank.ir/' );
+		}
+		if ( null === SettingAPI::get( 'novin_toman_conversion_enabled', null ) ) {
+			SettingAPI::set( 'novin_toman_conversion_enabled', 'on' );
 		}
 
 		//turn off woocommerce tracking

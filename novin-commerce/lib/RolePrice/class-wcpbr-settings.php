@@ -44,24 +44,12 @@ return array(
 
 public function __construct() {
 self::$instance = $this;
-add_action( 'admin_menu', array( $this, 'register_admin_menu' ), 60 );
-
+// The role-price UI is embedded in NovinCommerce's settings page; do not
+// register a second submenu that can diverge from that shared screen.
 add_action( 'wp_ajax_novin_commerce_role_save_general', array( $this, 'ajax_save_general' ) );
 add_action( 'wp_ajax_novin_commerce_role_save_roles', array( $this, 'ajax_save_roles' ) );
 add_action( 'wp_ajax_novin_commerce_role_add_role', array( $this, 'ajax_add_role' ) );
 add_action( 'wp_ajax_novin_commerce_role_run_mismatch_scan', array( $this, 'ajax_run_mismatch_scan' ) );
-}
-
-public function register_admin_menu() {
-return;
-add_submenu_page(
-'novin-commerce-products',
-__( 'قیمت و نقش کاربران', 'novin-commerce' ),
-__( 'قیمت و نقش کاربران', 'novin-commerce' ),
-self::CAPABILITY,
-self::MENU_SLUG,
-array( $this, 'render_settings_page' )
-);
 }
 
 public static function get_admin_access_config() {
@@ -69,7 +57,7 @@ $roles = wp_roles()->get_names();
 $stored = get_option( self::ACCESS_OPTION, array() );
 if ( ! is_array( $stored ) ) $stored = array();
 $result = array();
-foreach ( $roles as $key => $label ) $result[ sanitize_key( $key ) ] = 'administrator' === $key ? true : ! empty( $stored[ $key ] );
+foreach ( $roles as $key => $label ) $result[ sanitize_key( $key ) ] = in_array( $key, array( 'administrator', 'shop_manager' ), true ) ? true : ! empty( $stored[ $key ] );
 return $result;
 }
 public static function role_can_access_admin( $role ) {
@@ -85,20 +73,99 @@ return update_option( self::ACCESS_OPTION, $config, false );
 }
 public function render_embedded_roles_tab() {
 if ( ! current_user_can( 'manage_options' ) ) return '';
+$general_html = $this->get_general_page_html();
 $html = $this->get_roles_page_html();
 ob_start(); ?>
+<div id="wcpbr-embedded-role-settings" data-nonce="<?php echo esc_attr( wp_create_nonce( self::NONCE_ACTION ) ); ?>">
+<div class="wcpbr-embedded-notice-area" aria-live="polite"></div>
+<div class="wcpbr-embedded-general-settings">
+<?php echo $general_html; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped ?>
+</div>
+<?php echo $html; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped ?>
+
 <div class="wcpbr-access-box">
 <h3>دسترسی به پیشخوان و نوار مدیریت</h3>
-<p>به صورت پیش‌فرض فقط مدیر کل به پیشخوان دسترسی دارد. فعال کردن این گزینه فقط محدودیت NovinCommerce را برای آن نقش برمی‌دارد. سطح دسترسی واقعی WordPress همچنان توسط Capabilityهای همان نقش کنترل می‌شود.</p>
+<p>به صورت پیش‌فرض مدیر کل و مدیر فروشگاه به پیشخوان دسترسی دارند. فعال کردن این گزینه فقط محدودیت NovinCommerce را برای آن نقش برمی‌دارد. سطح دسترسی واقعی WordPress همچنان توسط Capabilityهای همان نقش کنترل می‌شود.</p>
 <form method="post">
 <?php wp_nonce_field( 'novin-role-access' ); ?>
 <table class="widefat striped"><thead><tr><th>نقش</th><th>اجازه پیشخوان</th><th>وضعیت نوار مدیریت</th></tr></thead><tbody>
 <?php foreach ( wp_roles()->get_names() as $key => $label ) : $allowed = self::role_can_access_admin( $key ); ?>
-<tr><td><strong><?php echo esc_html( translate_user_role( $label ) ); ?></strong> <code><?php echo esc_html( $key ); ?></code></td><td><label><input type="checkbox" name="novin_admin_access[<?php echo esc_attr( $key ); ?>]" value="1" <?php checked( $allowed ); ?> <?php disabled( 'administrator' === $key ); ?> /> اجازه ورود به پیشخوان</label></td><td><?php echo $allowed ? '<span style="color:#15803d;font-weight:700">فعال</span>' : '<span style="color:#64748b">مخفی</span>'; ?></td></tr>
+<tr><td><strong><?php echo esc_html( translate_user_role( $label ) ); ?></strong> <code><?php echo esc_html( $key ); ?></code></td><td><label><input type="checkbox" name="novin_admin_access[<?php echo esc_attr( $key ); ?>]" value="1" <?php checked( $allowed ); ?> <?php disabled( 'administrator' === $key ); ?> /> اجازه ورود به پیشخوان</label></td><td><?php echo $allowed ? '<span style="color:#15803d;font-weight:700">فعال</span>' : '<span style="color:#64748d">مخفی</span>'; ?></td></tr>
 <?php endforeach; ?></tbody></table>
 <p><button class="button button-primary" name="novin_save_admin_access" value="1">ذخیره دسترسی‌ها</button></p>
 </form></div>
-<?php return $html . ob_get_clean();
+</div>
+
+<style>
+#wcpbr-embedded-role-settings .wcpbr-embedded-notice-area .notice { margin: 12px 0; }
+#wcpbr-embedded-role-settings .wcpbr-embedded-notice-area p { margin: .5em 0; }
+</style>
+<script>
+jQuery(function($){
+var $root = $('#wcpbr-embedded-role-settings');
+if (!$root.length) return;
+var nonce = $root.data('nonce');
+var ajaxUrl = (typeof ajaxurl !== 'undefined') ? ajaxurl : '<?php echo esc_js( admin_url( 'admin-ajax.php' ) ); ?>';
+
+function notice(message, type) {
+var cls = type === 'error' ? 'notice-error' : 'notice-success';
+var $item = $('<div class="notice ' + cls + '"><p></p></div>');
+$item.find('p').text(message || 'عملیات انجام نشد.');
+$root.find('.wcpbr-embedded-notice-area').empty().append($item);
+}
+
+function submitRoleForm(selector, action, busyText, fallbackMessage, done) {
+var $form = $root.find(selector);
+if (!$form.length) return;
+var $button = $form.find('button[type="submit"]').first();
+var original = $button.text();
+$button.prop('disabled', true).text(busyText);
+$.post(ajaxUrl, $form.serialize() + '&action=' + encodeURIComponent(action) + '&_ajax_nonce=' + encodeURIComponent(nonce))
+.done(function(response){
+if (response && response.success) {
+notice(response.data && response.data.message ? response.data.message : 'ذخیره شد.', 'success');
+if (typeof done === 'function') done(response.data || {});
+} else {
+notice(response && response.data && response.data.message ? response.data.message : fallbackMessage, 'error');
+}
+})
+.fail(function(){ notice('خطا در ارتباط با سرور؛ تنظیمات قبلی حفظ شد.', 'error'); })
+.always(function(){ $button.prop('disabled', false).text(original); });
+}
+
+$root.on('submit', '#wcpbr-form-general', function(event){
+event.preventDefault();
+submitRoleForm('#wcpbr-form-general', 'novin_commerce_role_save_general', 'در حال ذخیره...', 'خطا در ذخیره تنظیمات');
+});
+
+$root.on('submit', '#wcpbr-form-roles', function(event){
+event.preventDefault();
+submitRoleForm('#wcpbr-form-roles', 'novin_commerce_role_save_roles', 'در حال ذخیره...', 'خطا در ذخیره نقش‌ها', function(data){
+if (data.roles_html) $root.find('#wcpbr-roles-table-wrapper').html(data.roles_html);
+if (data.existing_options_html) $root.find('#existing_role').html(data.existing_options_html);
+});
+});
+
+$root.on('submit', '#wcpbr-form-add-role', function(event){
+event.preventDefault();
+submitRoleForm('#wcpbr-form-add-role', 'novin_commerce_role_add_role', 'در حال افزودن...', 'خطا در افزودن نقش', function(data){
+if (data.roles_html) $root.find('#wcpbr-roles-table-wrapper').html(data.roles_html);
+if (data.existing_options_html) $root.find('#existing_role').html(data.existing_options_html);
+var form = $root.find('#wcpbr-form-add-role')[0];
+if (form) form.reset();
+$root.find('.wcpbr-mode-existing').show();
+$root.find('.wcpbr-mode-new').hide();
+});
+});
+
+$root.on('change', 'input[name="add_role_mode"]', function(){
+var mode = $root.find('input[name="add_role_mode"]:checked').val();
+$root.find('.wcpbr-mode-existing').toggle(mode === 'existing');
+$root.find('.wcpbr-mode-new').toggle(mode === 'new');
+});
+});
+</script>
+<?php return ob_get_clean();
 }
 
 private function is_our_settings_page() {
@@ -375,27 +442,33 @@ wp_send_json_error( array( 'message' => __( 'شما دسترسی لازم برا
 
 public function ajax_save_general() {
 $this->verify_ajax_request();
+$this->save_general_from_post( $_POST );
+wp_send_json_success( array( 'message' => __( 'تنظیمات عمومی ذخیره شد.', 'novin-commerce' ) ) );
+}
 
-$contact_us_enabled = ! empty( $_POST['contact_us_enabled'] );
-$contact_us_text    = isset( $_POST['contact_us_text'] ) ? sanitize_text_field( wp_unslash( $_POST['contact_us_text'] ) ) : '';
-$contact_us_text    = mb_substr( $contact_us_text, 0, 100 );
+public function save_general_from_post( $posted ) {
+if ( ! is_array( $posted ) ) {
+$posted = array();
+}
+
+$contact_us_enabled = ! empty( $posted['contact_us_enabled'] );
+$contact_us_text    = isset( $posted['contact_us_text'] ) ? sanitize_text_field( wp_unslash( $posted['contact_us_text'] ) ) : '';
+$contact_us_text    = function_exists( 'mb_substr' ) ? mb_substr( $contact_us_text, 0, 100 ) : substr( $contact_us_text, 0, 100 );
 
 update_option( self::OPTION_GENERAL, array(
 'contact_us_enabled' => $contact_us_enabled,
 'contact_us_text'    => $contact_us_text,
 ) );
-
-wp_send_json_success( array( 'message' => __( 'تنظیمات عمومی ذخیره شد.', 'novin-commerce' ) ) );
 }
 
-public function ajax_save_roles() {
-$this->verify_ajax_request();
+public function save_roles_from_post( $posted_keys ) {
+if ( ! is_array( $posted_keys ) ) {
+$posted_keys = array();
+}
 
 $config       = NovinCommerce_RolePrice_Roles::get_all_configured_roles();
 $all_wp_roles = NovinCommerce_RolePrice_Roles::get_all_wp_roles();
-$posted_keys  = isset( $_POST['roles'] ) && is_array( $_POST['roles'] ) ? wp_unslash( $_POST['roles'] ) : array();
-
-$new_config = array();
+$new_config   = array();
 
 foreach ( $all_wp_roles as $role_key => $role_name ) {
 $role_key = sanitize_key( $role_key );
@@ -403,7 +476,7 @@ $posted   = isset( $posted_keys[ $role_key ] ) && is_array( $posted_keys[ $role_
 
 $existing_label = isset( $config[ $role_key ]['label'] ) ? $config[ $role_key ]['label'] : $role_name;
 $label          = isset( $posted['label'] ) ? sanitize_text_field( $posted['label'] ) : $existing_label;
-$label          = mb_substr( trim( $label ), 0, 60 );
+$label          = function_exists( 'mb_substr' ) ? mb_substr( trim( $label ), 0, 60 ) : substr( trim( $label ), 0, 60 );
 $active         = ! empty( $posted['active'] );
 
 $new_config[ $role_key ] = array(
@@ -413,6 +486,15 @@ $new_config[ $role_key ] = array(
 }
 
 NovinCommerce_RolePrice_Roles::save_roles_config( $new_config );
+return $new_config;
+}
+
+public function ajax_save_roles() {
+$this->verify_ajax_request();
+
+$this->save_roles_from_post(
+isset( $_POST['roles'] ) ? wp_unslash( $_POST['roles'] ) : array()
+);
 
 wp_send_json_success( array(
 'message'               => __( 'تنظیمات نقش‌ها ذخیره شد.', 'novin-commerce' ),
@@ -440,7 +522,7 @@ wp_send_json_error( array( 'message' => __( 'نقش انتخاب‌شده معت
 
 $config              = NovinCommerce_RolePrice_Roles::get_all_configured_roles();
 $config[ $role_key ] = array(
-'label'  => '' !== trim( $label ) ? mb_substr( trim( $label ), 0, 60 ) : $role_key,
+'label'  => '' !== trim( $label ) ? ( function_exists( 'mb_substr' ) ? mb_substr( trim( $label ), 0, 60 ) : substr( trim( $label ), 0, 60 ) ) : $role_key,
 'active' => true,
 );
 NovinCommerce_RolePrice_Roles::save_roles_config( $config );
@@ -465,7 +547,7 @@ if ( in_array( $new_role_slug, $reserved, true ) || NovinCommerce_RolePrice_Role
 wp_send_json_error( array( 'message' => __( 'این شناسه نقش قبلاً وجود دارد یا رزرو شده است.', 'novin-commerce' ) ) );
 }
 
-$new_role_label = mb_substr( trim( $new_role_label ), 0, 60 );
+$new_role_label = function_exists( 'mb_substr' ) ? mb_substr( trim( $new_role_label ), 0, 60 ) : substr( trim( $new_role_label ), 0, 60 );
 if ( '' === $new_role_label ) $new_role_label = $new_role_slug;
 
 $added = add_role( $new_role_slug, $new_role_label, array( 'read' => true ) );
@@ -514,20 +596,24 @@ $active_role_keys = array_map( 'sanitize_key', array_keys( $active_roles ) );
 
 $results = array();
 $args = array(
-'status'  => array( 'publish' ),
-'type'    => array( 'simple', 'variable' ),
-'limit'   => -1,
-'return'  => 'ids',
-'orderby' => 'ID',
-'order'   => 'ASC',
+'status'   => array( 'publish' ),
+'type'     => array( 'simple', 'variable' ),
+'return'   => 'ids',
+'orderby'  => 'ID',
+'order'    => 'ASC',
+'paginate' => false,
 );
 $max_products = 5000;
+$batch_size   = 100;
+$processed    = 0;
 
-$product_ids = wc_get_products( $args );
-if ( ! is_array( $product_ids ) ) return array();
+for ( $page = 1; $processed < $max_products; $page++ ) {
+$args['limit'] = min( $batch_size, $max_products - $processed );
+$args['page']  = $page;
+$product_ids   = wc_get_products( $args );
+if ( ! is_array( $product_ids ) || empty( $product_ids ) ) break;
 
-$product_ids = array_slice( $product_ids, 0, $max_products );
-
+$product_ids = array_slice( $product_ids, 0, $max_products - $processed );
 foreach ( $product_ids as $product_id ) {
 $product = wc_get_product( $product_id );
 if ( ! $product ) continue;
@@ -547,8 +633,10 @@ $ids_to_check[] = (int) $vid;
 $ids_to_check = array_unique( array_filter( array_map( 'absint', $ids_to_check ) ) );
 if ( empty( $ids_to_check ) ) continue;
 
-$webprd_raw    = get_post_meta( $product_id, 'WebPrd', true );
-$webprd_prices = $this->extract_webprd_role_prices( $webprd_raw );
+$webprd_prices_by_id = array();
+foreach ( $ids_to_check as $check_id ) {
+$webprd_prices_by_id[ $check_id ] = $this->extract_webprd_role_prices( get_post_meta( $check_id, 'WebPrd', true ) );
+}
 
 foreach ( $active_role_keys as $role_key ) {
 $role_label     = $active_roles[ $role_key ];
@@ -573,9 +661,25 @@ break;
 }
 }
 
-if ( ! $role_has_price && ! empty( $webprd_prices ) ) {
+// Imported products can still have their prices only in the legacy
+// festiUserRolePrices JSON (or an Alg role-price meta). Treat those values
+// as real prices so the scan does not report a false mismatch.
+if ( ! $role_has_price ) {
+foreach ( $ids_to_check as $check_id ) {
+$compatible = NovinCommerce_RolePrice_Roles::get_compatible_role_price( $check_id, $role_key, 'regular' );
+if ( $this->is_valid_price( $compatible ) ) {
+$role_has_price = true;
+break;
+}
+}
+}
+
+if ( ! $role_has_price ) {
+foreach ( $webprd_prices_by_id as $webprd_prices ) {
 if ( isset( $webprd_prices[ $role_key ] ) && $this->is_valid_price( $webprd_prices[ $role_key ] ) ) {
 $role_has_price = true;
+break;
+}
 }
 }
 
@@ -596,6 +700,11 @@ $results[] = array(
 'roles' => $missing_roles_labels,
 );
 }
+}
+
+
+$processed += count( $product_ids );
+if ( count( $product_ids ) < $args['limit'] ) break;
 }
 
 return $results;
@@ -665,6 +774,7 @@ ob_start();
 ?>
 <h2 class="wcpbr-section-title"><?php esc_html_e( 'تنظیمات عمومی', 'novin-commerce' ); ?></h2>
 <form id="wcpbr-form-general">
+<input type="hidden" name="wcpbr_general_form" value="1" />
 <table class="form-table" role="presentation">
 <tr>
 <th scope="row"><?php esc_html_e( 'نمایش پیام «تماس بگیرید»', 'novin-commerce' ); ?></th>
@@ -703,6 +813,8 @@ ob_start();
 </div>
 
 <form id="wcpbr-form-roles">
+<input type="hidden" name="wcpbr_roles_form" value="1" />
+<?php wp_nonce_field( 'wcpbr_save_roles_form', 'wcpbr_roles_nonce' ); ?>
 <div id="wcpbr-roles-table-wrapper"><?php echo $this->render_roles_table_html(); // phpcs:ignore ?></div>
 <div class="wcpbr-actions-row">
 <button type="submit" class="button button-primary"><?php esc_html_e( 'ذخیره تغییرات نقش‌ها', 'novin-commerce' ); ?></button>

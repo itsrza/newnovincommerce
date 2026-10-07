@@ -16,7 +16,7 @@
  * Plugin Name:       Novin Commerce
  * Plugin URI:        https://npwp.ir/
  * Description:       Connect novin accounting app to woocommerce.
- * Version:           1.10.9
+ * Version:           1.16.0
  * Requires PHP:      7.4
  * Requires at least: 6.1
  * Requires Plugins:  woocommerce
@@ -50,7 +50,7 @@ if ( ! defined( 'WPINC' ) ) {
 \register_deactivation_hook( __FILE__, '\MobinDev\Novin_Commerce\Deactivator::deactivate' );
 
 add_action( 'wp_ajax_remove_guid', function () {
-    if ( ! current_user_can( 'manage_options' ) ) {
+    if ( ! current_user_can( 'manage_woocommerce' ) ) {
         wp_send_json_error( array( 'message' => 'دسترسی غیرمجاز' ), 403 );
     }
 
@@ -144,7 +144,13 @@ add_action('woocommerce_product_duplicate', function ($duplicate, $product) {
 }, 10, 2);
 
 
-
+// The order endpoints use WooCommerce CRUD APIs, so declare compatibility
+// with HPOS before WooCommerce initializes its feature registry.
+add_action( 'before_woocommerce_init', function () {
+	if ( class_exists( '\Automattic\WooCommerce\Utilities\FeaturesUtil' ) ) {
+		\Automattic\WooCommerce\Utilities\FeaturesUtil::declare_compatibility( 'custom_order_tables', __FILE__, true );
+	}
+} );
 
 /**
  * Begins execution of the plugin.

@@ -40,7 +40,7 @@ class Sync {
 		$this->plugin->get_loader()->add_action( 'profile_update', $this, 'userAddOrUpdate', 11, 2 );
 		//orders
 
-		$this->plugin->get_loader()->add_action( 'save_post_shop_order', $this, 'orderAddOrUpdate', 11, 2 );
+		$this->plugin->get_loader()->add_action( 'save_post_shop_order', $this, 'orderAddOrUpdate', 11, 3 );
 		$this->plugin->get_loader()->add_action( 'woocommerce_order_status_pending', $this, 'orderUpdateStatus', 11, 2 );
 		$this->plugin->get_loader()->add_action( 'woocommerce_order_status_failed', $this, 'orderUpdateStatus', 11, 2 );
 		$this->plugin->get_loader()->add_action( 'woocommerce_order_status_on-hold', $this, 'orderUpdateStatus', 11, 2 );
@@ -92,7 +92,7 @@ class Sync {
 	 * @param \WP_Post $post
 	 * @param boolean $update
 	 */
-	public function orderAddOrUpdate( $post_ID, $post, $update ) {
+	public function orderAddOrUpdate( $post_ID, $post, $update = false ) {
 		SyncModel::insertOrder( $post_ID );
 	}
 

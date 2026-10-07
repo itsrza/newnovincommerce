@@ -39,11 +39,12 @@ class Mismatch_Page {
 
     // رندر صفحه مغایرت‌ها (با cache)
     public static function renderPage() {
-		if ( current_user_can( 'manage_options' ) ) {
-			$plugin_file = dirname( __DIR__, 2 ) . '/novin-commerce.php';
-			wp_enqueue_style( 'novin-commerce-admin-table', plugins_url( 'dist/styles/admin/table.min.css', $plugin_file ), [], '1.10.9' );
+		if ( ! current_user_can( 'manage_woocommerce' ) ) {
+			wp_die( esc_html__( 'دسترسی غیرمجاز.', 'novin-commerce' ) );
 		}
-		if (isset($_GET['novin_refresh']) && current_user_can('manage_options')) {
+		$plugin_file = dirname( __DIR__, 2 ) . '/novin-commerce.php';
+		wp_enqueue_style( 'novin-commerce-admin-table', plugins_url( 'dist/styles/admin/table.min.css', $plugin_file ), [], '1.16.0' );
+		if (isset($_GET['novin_refresh']) && current_user_can('manage_woocommerce')) {
 			self::clearCache();
 			echo '<div class="notice notice-info"><p>کش مغایرت‌ها پاک شد.</p></div>';
 		}
@@ -73,7 +74,7 @@ class Mismatch_Page {
         }
 
         echo '<div class="wrap" dir="rtl">';
-        echo '<div class="novin-item-header"><div><span class="novin-kicker">NOVIN COMMERCE</span><h1>مغایرت‌گیری</h1><p>در این بخش کالاهایی نمایش داده می‌شوند که کلید GUID مشابه دارند.</p></div><a class="button" href="' . esc_url( admin_url( 'admin.php?page=novin-commerce-dashboard' ) ) . '">بازگشت به داشبورد</a></div>';
+        echo '<div class="novin-item-header"><div><span class="novin-kicker">NOVIN COMMERCE</span><h1>مغایرت‌گیری</h1><p>در این بخش کالاهایی نمایش داده می‌شوند که شناسه حسابداری مشابه دارند.</p></div><a class="button" href="' . esc_url( admin_url( 'admin.php?page=novin-commerce-dashboard' ) ) . '">بازگشت به داشبورد</a></div>';
 
 		echo '<p><a href="' . esc_url(add_query_arg('novin_refresh', '1')) . '" class="button">بروزرسانی نتایج</a></p>';
 
@@ -87,7 +88,7 @@ class Mismatch_Page {
         echo '<thead><tr>
                 <th>عنوان پست</th>
                 <th>نوع پست</th>
-                <th>GUID</th>
+                <th>شناسه حسابداری</th>
                 <th>نام در نرم‌افزار حسابداری</th>
                 <th>عملیات</th>
               </tr></thead><tbody>';

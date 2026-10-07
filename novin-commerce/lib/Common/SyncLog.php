@@ -15,7 +15,7 @@ class SyncLog {
                 'status'     => $status,
                 'item_type'  => sanitize_key( $item_type ),
                 'item_id'    => absint( $item_id ),
-                'message'    => sanitize_textarea_field( $message ),
+                'message'    => sanitize_textarea_field( Text_Encoding::normalize( $message ) ),
                 'context'    => $context_json,
                 'created_at'=> current_time( 'mysql', true ),
             ],
@@ -27,7 +27,13 @@ class SyncLog {
         global $wpdb;
         $table = $wpdb->prefix . 'novin_commerce_sync_logs';
         $limit = min( 50, max( 1, absint( $limit ) ) );
-        return $wpdb->get_results( $wpdb->prepare( "SELECT * FROM {$table} ORDER BY id DESC LIMIT %d", $limit ) );
+        $rows  = $wpdb->get_results( $wpdb->prepare( "SELECT * FROM {$table} ORDER BY id DESC LIMIT %d", $limit ) );
+        foreach ( (array) $rows as $row ) {
+            if ( isset( $row->message ) ) {
+                $row->message = Text_Encoding::normalize( $row->message );
+            }
+        }
+        return $rows;
     }
 
     public static function count_since( $seconds = 86400, $status = null ) {
@@ -43,7 +49,8 @@ class SyncLog {
     public static function prune( $days = 30 ) {
         global $wpdb;
         $table = $wpdb->prefix . 'novin_commerce_sync_logs';
-        $cutoff = gmdate( 'Y-m-d H:i:s', time() - ( absint( $days ) * DAY_IN_SECONDS ) );
+        $days = max( 1, absint( $days ) );
+        $cutoff = gmdate( 'Y-m-d H:i:s', time() - ( $days * DAY_IN_SECONDS ) );
         return $wpdb->query( $wpdb->prepare( "DELETE FROM {$table} WHERE created_at < %s", $cutoff ) );
     }
 }

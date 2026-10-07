@@ -18,7 +18,10 @@ namespace MobinDev\Novin_Commerce;
 use As247\WpEloquent\Application;
 use MobinDev\Novin_Commerce\Admin\AdminNotice;
 use MobinDev\Novin_Commerce\Admin\Menu;
+use MobinDev\Novin_Commerce\Common\Currency_Conversion;
 use MobinDev\Novin_Commerce\Common\Woocommerce;
+use MobinDev\Novin_Commerce\Common\Sync;
+use MobinDev\Novin_Commerce\Digits\Digits_Module;
 use MobinDev\Novin_Commerce\Frontend\Shortcode;
 use MobinDev\Novin_Commerce\Frontend\Woocommerce_Menu;
 
@@ -64,7 +67,7 @@ class Plugin {
 	 * @access   protected
 	 * @var      string $version The current version of the plugin.
 	 */
-	protected $version = '1.10.9';
+	protected $version = '1.16.0';
 
 	/**
 	 * Define the core functionality of the plugin.
@@ -130,10 +133,18 @@ class Plugin {
 //		$this->loader->add_action( 'wp_enqueue_scripts', $plugin_frontend, 'enqueue_scripts' );
 
 		new Woocommerce( $this );
+		// Keep the automatic queue hooks active on both the public site and
+		// admin requests. Manual table actions are only a fallback; product,
+		// order, customer, category and variation changes must be queued too.
+		new Sync( $this );
 		new Shortcode( $this );
 		new Woocommerce_Menu( $this );
 
 		if ( class_exists( '\WooCommerce' ) ) {
+			// Register unit conversion before role pricing. The conversion
+			// callback runs at the final priority, after any role price has
+			// been selected, so role prices are divided exactly once.
+			Currency_Conversion::boot();
 			\MobinDev\Novin_Commerce\RolePrice\Bootstrap::boot();
 		}
 
@@ -151,8 +162,10 @@ class Plugin {
 		Application::bootWp();
 		Activator::maybeUpgrade();
 		$this->set_locale();
+		$this->loader->add_action( 'novin_commerce_daily_maintenance', Activator::class, 'run_maintenance', 10, 0 );
 		$this->define_admin_hooks();
 		$this->define_frontend_hooks();
+		Digits_Module::boot( $this );
 		$this->loader->run();
 	}
 

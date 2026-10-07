@@ -39,8 +39,9 @@ class Novin_REST_Controller extends \WC_REST_CRUD_Controller {
 			'/' . $this->rest_base . '/version',
 			[
 				array(
-					'methods'  => \WP_REST_Server::READABLE,
-					'callback' => [ $this, 'getVersion' ]
+					'methods'             => \WP_REST_Server::READABLE,
+					'callback'            => [ $this, 'getVersion' ],
+					'permission_callback' => '__return_true',
 				)
 			]
 		);
@@ -413,61 +414,37 @@ class Novin_REST_Controller extends \WC_REST_CRUD_Controller {
 	public function getCustomersIds( $request ) {
 		global $wpdb;
 
-		$limit  = $request->get_param( 'per_page' );
-		$offset = ( $request->get_param( 'page' ) - 1 ) * $limit;
+		$limit  = max( 1, (int) $request->get_param( 'per_page' ) );
+		$page   = max( 1, (int) $request->get_param( 'page' ) );
+		$offset = ( $page - 1 ) * $limit;
+		$by_guid = (bool) $request->get_param( 'guid' );
+		$by_phone = (bool) $request->get_param( 'digits_phone_no' );
 
-		if ( $request->get_param( 'guid' ) ) {
-			$query = "
-						FROM $wpdb->usermeta
-						WHERE meta_key = 'guid'
-						ORDER BY umeta_id";
-			$data  = $wpdb->get_results( $wpdb->prepare(
-				"
-						SELECT user_id as id, meta_value as guid
-						" .
-				$query .
-				"
-						LIMIT %d
-						OFFSET %d
-    					", $limit, $offset ) );
-		} else if( $request->get_param( 'digits_phone_no' )){
-			$query = "
-						FROM $wpdb->usermeta
-						WHERE meta_key = 'digits_phone_no'
-						ORDER BY umeta_id";
-			$data  = $wpdb->get_results( $wpdb->prepare(
-				"
-						SELECT user_id as id, meta_value as digits_phone_no
-						" .
-				$query .
-				"
-						LIMIT %d
-						OFFSET %d
-						", $limit, $offset ) );
+		if ( $by_guid || $by_phone ) {
+			$meta_key = $by_guid ? 'guid' : 'digits_phone_no';
+			$select   = 'guid' === $meta_key ? 'meta_value as guid' : 'meta_value as digits_phone_no';
+				$data = $wpdb->get_results(
+					$wpdb->prepare(
+						"SELECT user_id as id, MAX(meta_value) as {$meta_key} FROM {$wpdb->usermeta} WHERE meta_key = %s GROUP BY user_id ORDER BY MIN(umeta_id) LIMIT %d OFFSET %d",
+						$meta_key,
+						$limit,
+						$offset
+					)
+				);
+				$total = (int) $wpdb->get_var(
+					$wpdb->prepare( "SELECT COUNT(DISTINCT user_id) FROM {$wpdb->usermeta} WHERE meta_key = %s", $meta_key )
+				);
 		} else {
-			$query = "
-						FROM $wpdb->users
-						ORDER BY ID";
-			$data  = $wpdb->get_col( $wpdb->prepare(
-				"
-						SELECT ID
-						" .
-				$query .
-				"
-						LIMIT %d
-						OFFSET %d
-    				", $limit, $offset ) );
+			$data = $wpdb->get_col(
+				$wpdb->prepare( "SELECT ID FROM {$wpdb->users} ORDER BY ID LIMIT %d OFFSET %d", $limit, $offset )
+			);
+			$total = (int) $wpdb->get_var( "SELECT COUNT(*) FROM {$wpdb->users}" ); // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.PreparedSQL.NotPrepared -- fixed core table identifier.
 		}
-
-
-		$total = $wpdb->get_var( $wpdb->prepare( "SELECT COUNT(*) " . $query ) );
 
 		return new \WP_REST_Response( $data, 200, [
 			'X-WP-Total'      => $total,
 			'X-WP-TotalPages' => (int) ceil( $total / $limit ),
 		] );
-
-
 	}
 
 	/**
@@ -539,7 +516,7 @@ class Novin_REST_Controller extends \WC_REST_CRUD_Controller {
 		", $digits_phone_no) );
 
 		if ( empty( $id ) ) {
-			return new \WP_Error( 'digits_phone_no_not_found', __( 'digits_phone_no_not_found', 'novin-commerce' ), array( 'status' => 404 ) );
+			return new \WP_Error( 'digits_phone_no_not_found', __( 'شماره موبایل برای هیچ کاربری ثبت نشده است.', 'novin-commerce' ), array( 'status' => 404 ) );
 		}
 
 		return new \WP_REST_Response( $id );
@@ -619,8 +596,31 @@ class Novin_REST_Controller extends \WC_REST_CRUD_Controller {
 	 * @return \WP_Error|\WP_REST_Response
 	 */
 	public function getOrderGuid( $request ) {
-		return $this->getPostMetaGuid( $request, 'shop_order' );
+		$guid = sanitize_text_field( (string) $request->get_param( 'guid' ) );
+		if ( '' === $guid || ! function_exists( 'wc_get_orders' ) ) {
+			return new \WP_Error( 'order_or_guid_not_found', __( 'Order or GUID not found.', 'novin-commerce' ), array( 'status' => 404 ) );
+		}
 
+		$orders = wc_get_orders(
+			array(
+				'limit'      => 2,
+				'return'     => 'ids',
+				'paginate'   => false,
+				'meta_query' => array(
+					array(
+						'key'     => 'guid',
+						'value'   => $guid,
+						'compare' => '=',
+					),
+				),
+			)
+		);
+		$orders = is_array( $orders ) ? array_map( 'absint', $orders ) : array();
+		if ( empty( $orders ) ) {
+			return new \WP_Error( 'order_or_guid_not_found', __( 'Order or GUID not found.', 'novin-commerce' ), array( 'status' => 404 ) );
+		}
+
+		return new \WP_REST_Response( $orders );
 	}
 
 	/**
@@ -649,19 +649,67 @@ class Novin_REST_Controller extends \WC_REST_CRUD_Controller {
 	 * @return \WP_Error|\WP_REST_Response
 	 */
 	public function getOrdersIds( $request ) {
-		return $this->getPostsIds( $request, 'shop_order' );
+		if ( ! function_exists( 'wc_get_orders' ) ) {
+			return $this->getPostsIds( $request, 'shop_order' );
+		}
+
+		$limit     = max( 1, (int) $request->get_param( 'per_page' ) );
+		$page      = max( 1, (int) $request->get_param( 'page' ) );
+		$date_from = $request->get_param( 'modified_date_from' );
+		$date_to   = $request->get_param( 'modified_date_to' );
+		$args      = array(
+			'limit'    => $limit,
+			'paged'    => $page,
+			'paginate' => true,
+			'return'   => 'objects',
+			'orderby'  => 'date_modified',
+			'order'    => 'ASC',
+		);
+		$date_query = array();
+		if ( null !== $date_from && '' !== (string) $date_from ) {
+			$date_query['after'] = sanitize_text_field( $date_from );
+		}
+		if ( null !== $date_to && '' !== (string) $date_to ) {
+			$date_query['before'] = sanitize_text_field( $date_to );
+		}
+		if ( ! empty( $date_query ) ) {
+			$args['date_modified'] = $date_query;
+		}
+
+		$result = wc_get_orders( $args );
+		$orders = is_object( $result ) && isset( $result->orders ) ? $result->orders : ( is_array( $result ) ? $result : array() );
+		$total  = is_object( $result ) && isset( $result->total ) ? (int) $result->total : count( $orders );
+		$data   = array();
+		foreach ( $orders as $order ) {
+			if ( ! is_object( $order ) || ! is_callable( array( $order, 'get_id' ) ) ) {
+				continue;
+			}
+			$modified = is_callable( array( $order, 'get_date_modified' ) ) ? $order->get_date_modified() : null;
+			$data[] = (object) array(
+				'ID'               => absint( $order->get_id() ),
+				'post_modified_gmt' => $modified && is_callable( array( $modified, 'getTimestamp' ) )
+					? gmdate( 'Y-m-d H:i:s', $modified->getTimestamp() )
+					: '',
+			);
+		}
+
+		return new \WP_REST_Response( $data, 200, [
+			'X-WP-Total'      => $total,
+			'X-WP-TotalPages' => (int) ceil( $total / $limit ),
+		] );
 	}
 
 	/**
 	 * @param $request \WP_REST_Request
 	 *
-	 * @return \WP_Error|\WP_REST_Response
+	 * @return \WP_REST_Response
 	 */
 	public function getCategoriesIds( $request ) {
 		global $wpdb;
 
-		$limit  = $request->get_param( 'per_page' );
-		$offset = ( $request->get_param( 'page' ) - 1 ) * $limit;
+		$limit  = max( 1, (int) $request->get_param( 'per_page' ) );
+		$page   = max( 1, (int) $request->get_param( 'page' ) );
+		$offset = ( $page - 1 ) * $limit;
 
 		$data = $wpdb->get_col( $wpdb->prepare(
 			"
@@ -697,37 +745,41 @@ class Novin_REST_Controller extends \WC_REST_CRUD_Controller {
 	public function getPostsIds( $request, $post_type ) {
 		global $wpdb;
 
-		$limit     = $request->get_param( 'per_page' );
-		$offset    = ( $request->get_param( 'page' ) - 1 ) * $limit;
+		$limit     = max( 1, (int) $request->get_param( 'per_page' ) );
+		$page      = max( 1, (int) $request->get_param( 'page' ) );
+		$offset    = ( $page - 1 ) * $limit;
 		$date_from = $request->get_param( 'modified_date_from' );
 		$date_to   = $request->get_param( 'modified_date_to' );
 
-		$query_date_from = is_null( $date_from ) ? '' : $wpdb->prepare( " AND post_modified_gmt > %s", $date_from );
-		$query_date_to   = is_null( $date_to ) ? '' : $wpdb->prepare( " AND post_modified_gmt < %s", $date_to );
+		$where = 'post_type = %s';
+		$args  = [ sanitize_key( $post_type ) ];
+		if ( null !== $date_from && '' !== (string) $date_from ) {
+			$where .= ' AND post_modified_gmt > %s';
+			$args[] = sanitize_text_field( $date_from );
+		}
+		if ( null !== $date_to && '' !== (string) $date_to ) {
+			$where .= ' AND post_modified_gmt < %s';
+			$args[] = sanitize_text_field( $date_to );
+		}
 
+		$data_args   = $args;
+		$data_args[] = $limit;
+		$data_args[] = $offset;
+		$data = $wpdb->get_results(
+			$wpdb->prepare(
+				"SELECT ID, post_modified_gmt FROM {$wpdb->posts} WHERE {$where} ORDER BY post_modified_gmt, ID LIMIT %d OFFSET %d",
+				$data_args
+			)
+		);
 
-		$data = $wpdb->get_results( $wpdb->prepare(
-			"
-						SELECT ID, post_modified_gmt
-						FROM $wpdb->posts
-						WHERE post_type = %s{$query_date_from}{$query_date_to}
-						ORDER BY post_modified_gmt
-						LIMIT %d
-						OFFSET %d
-    				", $post_type, $limit, $offset ) );
+		$total = (int) $wpdb->get_var(
+			$wpdb->prepare( "SELECT COUNT(*) FROM {$wpdb->posts} WHERE {$where}", $args )
+		);
 
-		$total    = $wpdb->get_var( $wpdb->prepare( "SELECT COUNT(*)
-						FROM $wpdb->posts
-						WHERE post_type = %s{$query_date_from}{$query_date_to}
-						ORDER BY post_modified_gmt", $post_type ) );
-		$response = new \WP_REST_Response( $data, 200, [
+		return new \WP_REST_Response( $data, 200, [
 			'X-WP-Total'      => $total,
 			'X-WP-TotalPages' => (int) ceil( $total / $limit ),
 		] );
-
-		return $response;
-
-
 	}
 
 	/**
@@ -773,7 +825,7 @@ class Novin_REST_Controller extends \WC_REST_CRUD_Controller {
 
 	public function getSyncs( $request ) {
 		return [
-			'all'       => Sync::all()->count(),
+			'all'       => Sync::count(),
 			'product'   => Sync::where( 'item_type', 'product' )->count(),
 			'order'     => Sync::where( 'item_type', 'order' )->count(),
 			'category'  => Sync::where( 'item_type', 'category' )->count(),
@@ -810,8 +862,9 @@ class Novin_REST_Controller extends \WC_REST_CRUD_Controller {
 	}
 
 	public function getItemsSyncs( $request, $type ) {
-		$limit  = $request->get_param( 'per_page' );
-		$offset = ( $request->get_param( 'page' ) - 1 ) * $limit;
+		$limit  = max( 1, (int) $request->get_param( 'per_page' ) );
+		$page   = max( 1, (int) $request->get_param( 'page' ) );
+		$offset = ( $page - 1 ) * $limit;
 		$data   = Sync::where( 'item_type', $type )->orderBy( 'priority', 'desc' )->orderBy( 'id', 'asc' )->offset( $offset )->limit( $limit )->get();
 		$total  = Sync::where( 'item_type', $type )->count();
 
@@ -843,7 +896,7 @@ class Novin_REST_Controller extends \WC_REST_CRUD_Controller {
 	}
 
 	public function checkPermission( \WP_REST_Request $request ) {
-		if ( current_user_can( 'manage_options' ) ) {
+		if ( current_user_can( 'manage_woocommerce' ) || current_user_can( 'manage_options' ) ) {
 			return true;
 		}
 
@@ -873,12 +926,18 @@ class Novin_REST_Controller extends \WC_REST_CRUD_Controller {
 				'sanitize_callback' => 'absint',
 				'validate_callback' => 'rest_validate_request_arg',
 			),
-			'guid'     => array(
-				'description'       => __( 'Get customers that has guid.' ),
+			'guid'            => array(
+				'description'       => __( 'Get customers that have a GUID.' ),
 				'type'              => 'boolean',
 				'default'           => false,
 				'validate_callback' => 'rest_validate_request_arg',
-			)
+			),
+			'digits_phone_no' => array(
+				'description'       => __( 'Get customers that have a Digits phone number.' ),
+				'type'              => 'boolean',
+				'default'           => false,
+				'validate_callback' => 'rest_validate_request_arg',
+			),
 		);
 	}
 

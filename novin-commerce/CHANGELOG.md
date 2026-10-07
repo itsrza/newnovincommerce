@@ -1,3 +1,38 @@
+## 1.16.0
+- اصلاح pagination و شمارش REST برای مشتری، محصول، سفارش، دسته‌بندی و صف Sync؛ endpoint نسخه عمومی باقی می‌ماند و جست‌وجوی سفارش از طریق CRUD ووکامرس با HPOS سازگار است.
+- فعال‌سازی صف خودکار Sync برای تغییرات اصلی بدون افزودن autosave عمومی ووکامرس، بهبود lifecycle نگهداری روزانه و پاک‌سازی لاگ پیامک و OTP.
+- ایمن‌سازی OTP با مصرف اتمیک، محدودیت درخواست بر اساس IP، honeypot فرم و جست‌وجوی شماره فقط از متای canonical؛ captcha همچنان نیازمند provider واقعی است.
+- conservative کردن تشخیص پاسخ NPSMS، حفظ metadata ناشناخته قیمت‌های legacy، و پاک‌سازی multisite-aware هنگام uninstall.
+- دسترسی پیشخوان و actionهای مدیریتی بر اساس capabilityهای ووکامرس برای مدیر فروشگاه و حفظ محدودیت تنظیمات حساس.
+- حفظ ستون‌های فنی جدول دسته‌بندی، اصلاح ترتیب سراسری pagination/مرتب‌سازی کالاها، اتصال فرمت شماره سفارش به نمایش فاکتور و ماسک شماره در گزارش پیامک.
+
+## 1.15.0
+- افزودن تنظیم تبدیل ریال به تومان با فعال بودن پیش‌فرض؛ قیمت‌های کالا، قیمت نقش‌ها، سبد خرید، تسویه‌حساب، سفارش‌ها و نمایش پنل مدیریت بر اساس این واحد هماهنگ می‌شوند و مقدار خام حسابداری حفظ می‌شود.
+- تب‌های تنظیمات حسابداری به‌صورت client-side و بدون بارگذاری مجدد جابه‌جا می‌شوند و یک فرم مشترک همه تغییرات را هم‌زمان ذخیره می‌کند.
+- نمایش plaintext رمز اتصال با حفظ رمزنگاری مقدار ذخیره‌شده، اصلاح UTF-8 لاگ‌های Sync و پیامک و ترجمه رویدادها و وضعیت‌های فنی.
+- ساده‌سازی جدول کالاها و دسته‌بندی‌ها و خواندن زمان همگام‌سازی اشخاص از کلید Modified در متای JSON به نام WebCus.
+
+## 1.14.0
+- بازگردانی نمایش فیلدهای قیمت نقش‌ها در صفحه محصول و variation.
+- پشتیبانی از نصب هم‌زمان افزونه قدیمی WCPBR بدون غیرفعال شدن ماژول قیمت‌گذاری NovinCommerce.
+- افزایش نسخه به‌دلیل این اصلاحات.
+
+## 1.13.0
+- افزایش نسخه به‌دلیل اصلاحات قیمت‌گذاری نقش‌ها و ذخیره تنظیمات.
+
+## 1.12.0
+- Gateway password fields now show the characters while the administrator is entering them and after the settings page is refreshed.
+- SMS gateway fields autosave on blur/change; other tabs save only with the main save button.
+- Settings tabs switch without a page refresh, so edits across tabs can be saved together.
+- Version bump.
+- Fixed role settings saves in the embedded settings tab so selecting multiple roles no longer falls through to a blank admin response; added an AJAX error notice and a secure non-JavaScript fallback.
+- Role prices now read and write the compatible `festiUserRolePrices` JSON for both products and variations, while preserving variation-specific prices during accounting sync.
+
+## 1.11.0
+- Added optional mobile-number OTP login and registration for WordPress and WooCommerce.
+- Added Digits settings, SMS gateway logging, NPSMS ASP.NET response handling, and secure gateway-password storage.
+- Added per-field settings autosave with a saved confirmation toast.
+
 ## 1.10.9
 - Reverted the 1.10.7 attempt to fix the /wc/v3/novin/version PHP-notice-leak issue. That fix (opening an output buffer at plugin-load time, plus a rest_pre_serve_request cleanup filter clearing all open output buffers) was confirmed by the site owner to actually break the endpoint on fadak-gostar.com — reverting to the pre-1.10.7 behaviour (going back to the plain 1.6.1-era code, `return $this->plugin->get_version();`) was confirmed working. getVersion() and the REST/AJAX wiring around it are back to that simple, known-good shape. The underlying PHP-notice-leak (from an unrelated plugin on that site, "company-comment-reaction") is not fixed by us — it was never actually caused by this plugin, and any real fix belongs in WP_DEBUG_DISPLAY configuration on that site or in the other plugin.
 

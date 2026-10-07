@@ -14,12 +14,15 @@ final class Bootstrap {
             return;
         }
 
-        // During migration, do not load a second copy of the old standalone plugin.
-        if ( defined( 'WCPBR_VERSION' ) ) {
-            return;
-        }
-
+        // The bundled module uses NovinCommerce_* class names and can safely
+        // coexist with an older standalone WCPBR installation. Do not skip
+        // the admin fields just because that legacy plugin defines
+        // WCPBR_VERSION; imported products still need this module's fields
+        // and Festi-compatible price reader.
         self::$booted = true;
+        if ( class_exists( '\\MobinDev\\Novin_Commerce\\Common\\Currency_Conversion' ) ) {
+            \MobinDev\Novin_Commerce\Common\Currency_Conversion::boot();
+        }
 
         $files = array(
             'class-wcpbr-roles.php',

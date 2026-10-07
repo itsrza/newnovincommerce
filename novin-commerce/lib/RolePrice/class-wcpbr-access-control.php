@@ -6,9 +6,9 @@ if ( ! defined( 'ABSPATH' ) ) {
 /**
  * کنترل دسترسی به پیشخوان و نوار مدیریت وردپرس.
  *
- * فقط نقش administrator اجازه استفاده از wp-admin و Admin Bar را دارد.
- * تمام نقش‌های دیگر (از جمله Author, Editor, Contributor, Subscriber و نقش‌های سفارشی)
- * از پیشخوان خارج می‌شوند و Admin Bar را نمی‌بینند.
+ * مدیرکل و نقش‌هایی که capability مدیریت ووکامرس دارند (از جمله shop_manager)
+ * می‌توانند از wp-admin استفاده کنند. سایر نقش‌ها فقط در صورت فعال شدن
+ * از بخش دسترسی نقش‌ها اجازه ورود می‌گیرند.
  */
 class NovinCommerce_RolePrice_Access_Control {
 
@@ -45,17 +45,35 @@ class NovinCommerce_RolePrice_Access_Control {
 	}
 
 	/**
-	 * Admin Bar برای تمام کاربران لاگین‌شده غیر Administrator خاموش می‌شود.
+	 * دسترسی پیشخوان بر اساس capability و سپس تنظیم legacy نقش‌ها تعیین می‌شود.
+	 */
+	public static function can_access_admin( $user = null ) {
+		if ( ! $user ) {
+			$user = wp_get_current_user();
+		}
+		if ( ! ( $user instanceof WP_User ) || empty( $user->roles ) ) {
+			return false;
+		}
+		if ( self::is_administrator( $user ) || user_can( $user, 'manage_woocommerce' ) ) {
+			return true;
+		}
+		foreach ( (array) $user->roles as $role ) {
+			if ( class_exists( 'NovinCommerce_RolePrice_Settings' ) && NovinCommerce_RolePrice_Settings::role_can_access_admin( $role ) ) {
+				return true;
+			}
+		}
+		return false;
+	}
+
+	/**
+	 * Admin Bar برای کاربران بدون دسترسی مدیریت خاموش می‌شود.
 	 */
 	public function hide_admin_bar_for_non_admins( $show ) {
 		if ( ! is_user_logged_in() ) {
 			return $show;
 		}
 
-		if ( self::is_administrator() ) return $show;
-		$user = wp_get_current_user();
-		foreach ( (array) $user->roles as $role ) { if ( class_exists( 'NovinCommerce_RolePrice_Settings' ) && NovinCommerce_RolePrice_Settings::role_can_access_admin( $role ) ) return $show; }
-		return false;
+		return self::can_access_admin() ? $show : false;
 	}
 
 	/**
@@ -63,11 +81,9 @@ class NovinCommerce_RolePrice_Access_Control {
 	 * AJAX و admin-post.php آزاد هستند تا عملکرد ووکامرس و فرم‌های عمومی مختل نشود.
 	 */
 	public function block_dashboard_for_non_admins() {
-		if ( ! is_user_logged_in() || self::is_administrator() ) {
+		if ( ! is_user_logged_in() || self::can_access_admin() ) {
 			return;
 		}
-		$user = wp_get_current_user();
-		foreach ( (array) $user->roles as $role ) { if ( class_exists( 'NovinCommerce_RolePrice_Settings' ) && NovinCommerce_RolePrice_Settings::role_can_access_admin( $role ) ) return; }
 
 		// admin-ajax.php باید برای درخواست‌های AJAX عمومی و ووکامرس قابل استفاده باشد.
 		if ( function_exists( 'wp_doing_ajax' ) && wp_doing_ajax() ) {
@@ -93,11 +109,9 @@ class NovinCommerce_RolePrice_Access_Control {
 	 * این بخش فقط روی کاربران غیر Administrator اعمال می‌شود.
 	 */
 	public function enforce_frontend_admin_bar_restriction() {
-		if ( ! is_user_logged_in() || self::is_administrator() ) {
+		if ( ! is_user_logged_in() || self::can_access_admin() ) {
 			return;
 		}
-		$user = wp_get_current_user();
-		foreach ( (array) $user->roles as $role ) { if ( class_exists( 'NovinCommerce_RolePrice_Settings' ) && NovinCommerce_RolePrice_Settings::role_can_access_admin( $role ) ) return; }
 
 		// مقدار WordPress را به صورت قطعی false نگه می‌داریم.
 		add_filter( 'show_admin_bar', '__return_false', PHP_INT_MAX );
@@ -111,8 +125,7 @@ class NovinCommerce_RolePrice_Access_Control {
 			return $redirect_to;
 		}
 
-		if ( self::is_administrator( $user ) ) return $redirect_to;
-		foreach ( (array) $user->roles as $role ) { if ( class_exists( 'NovinCommerce_RolePrice_Settings' ) && NovinCommerce_RolePrice_Settings::role_can_access_admin( $role ) ) return $redirect_to; }
+		if ( self::can_access_admin( $user ) ) return $redirect_to;
 		return $this->get_redirect_target();
 	}
 
