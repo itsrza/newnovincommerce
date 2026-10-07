@@ -13,17 +13,18 @@
  * @subpackage Novin_Commerce/includes
  */
 
-namespace Novinwp\Novin_Commerce;
+namespace MobinDev\Novin_Commerce;
 
 use As247\WpEloquent\Application;
-use Novinwp\Novin_Commerce\Admin\AdminNotice;
-use Novinwp\Novin_Commerce\Admin\Menu;
-use Novinwp\Novin_Commerce\Common\Currency_Conversion;
-use Novinwp\Novin_Commerce\Common\Woocommerce;
-use Novinwp\Novin_Commerce\Common\Sync;
-use Novinwp\Novin_Commerce\Digits\Digits_Module;
-use Novinwp\Novin_Commerce\Frontend\Shortcode;
-use Novinwp\Novin_Commerce\Frontend\Woocommerce_Menu;
+use MobinDev\Novin_Commerce\Admin\AdminNotice;
+use MobinDev\Novin_Commerce\Admin\Menu;
+use MobinDev\Novin_Commerce\Common\Currency_Conversion;
+use MobinDev\Novin_Commerce\Common\Woocommerce;
+use MobinDev\Novin_Commerce\Common\Sync;
+use MobinDev\Novin_Commerce\Common\Accounting\Product_Health_Snapshot;
+use MobinDev\Novin_Commerce\Digits\Digits_Module;
+use MobinDev\Novin_Commerce\Frontend\Shortcode;
+use MobinDev\Novin_Commerce\Frontend\Woocommerce_Menu;
 
 /**
  * The core plugin class.
@@ -37,7 +38,7 @@ use Novinwp\Novin_Commerce\Frontend\Woocommerce_Menu;
  * @since      1.0.0
  * @package    Novin_Commerce
  * @subpackage Novin_Commerce/includes
- * @author     Novinwp <info@npwp.ir>
+ * @author     MobinDev <mobin7332@gmail.com>
  */
 class Plugin {
 
@@ -133,6 +134,7 @@ class Plugin {
 //		$this->loader->add_action( 'wp_enqueue_scripts', $plugin_frontend, 'enqueue_scripts' );
 
 		new Woocommerce( $this );
+		Product_Health_Snapshot::boot();
 		// Keep the automatic queue hooks active on both the public site and
 		// admin requests. Manual table actions are only a fallback; product,
 		// order, customer, category and variation changes must be queued too.
@@ -145,7 +147,7 @@ class Plugin {
 			// callback runs at the final priority, after any role price has
 			// been selected, so role prices are divided exactly once.
 			Currency_Conversion::boot();
-			\Novinwp\Novin_Commerce\RolePrice\Bootstrap::boot();
+			\MobinDev\Novin_Commerce\RolePrice\Bootstrap::boot();
 		}
 
 	}
@@ -160,9 +162,14 @@ class Plugin {
 	 */
 	public function run() {
 		Application::bootWp();
-		Activator::maybeUpgrade();
+		// Schema upgrades are explicit activation/admin work. A frontend or
+		// REST read must not schedule events or mutate plugin tables/options.
+		if ( is_admin() ) {
+			add_action( 'admin_init', [ Activator::class, 'maybeUpgrade' ], 1 );
+		}
 		$this->set_locale();
 		$this->loader->add_action( 'novin_commerce_daily_maintenance', Activator::class, 'run_maintenance', 10, 0 );
+		$this->loader->add_action( 'novin_commerce_run_migration', Activator::class, 'run_migration', 10, 0 );
 		$this->define_admin_hooks();
 		$this->define_frontend_hooks();
 		Digits_Module::boot( $this );

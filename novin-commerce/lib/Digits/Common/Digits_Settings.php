@@ -1,6 +1,6 @@
 <?php
 
-namespace Novinwp\Novin_Commerce\Digits\Common;
+namespace MobinDev\Novin_Commerce\Digits\Common;
 
 /**
  * Settings storage for the Digits (mobile signup/login) module.
@@ -45,16 +45,28 @@ class Digits_Settings {
 	 * @return array<string,string>
 	 */
 	public static function get_gateway_settings( $gateway_slug ) {
-		$all_gateways = self::get( 'sms_gateways', [] );
-		$settings     = is_array( $all_gateways ) && isset( $all_gateways[ $gateway_slug ] ) && is_array( $all_gateways[ $gateway_slug ] )
-			? $all_gateways[ $gateway_slug ]
-			: [];
+		$settings = self::get_gateway_storage_settings( $gateway_slug );
 
 		if ( isset( $settings['password'] ) && '' !== $settings['password'] ) {
 			$settings['password'] = Secret_Crypt::decrypt( $settings['password'] );
 		}
 
 		return $settings;
+	}
+
+	/**
+	 * Read the option representation without decrypting it. This is only for
+	 * preserving an existing ciphertext when an admin leaves a password field
+	 * blank; it must never be returned in a response or rendered in HTML.
+	 *
+	 * @param string $gateway_slug Gateway identifier.
+	 * @return array<string,mixed>
+	 */
+	public static function get_gateway_storage_settings( $gateway_slug ) {
+		$all_gateways = self::get( 'sms_gateways', [] );
+		return is_array( $all_gateways ) && isset( $all_gateways[ $gateway_slug ] ) && is_array( $all_gateways[ $gateway_slug ] )
+			? $all_gateways[ $gateway_slug ]
+			: [];
 	}
 
 	/**
@@ -81,13 +93,21 @@ class Digits_Settings {
 	 * @param array<string,string> $settings Plain-text values as submitted by the admin form.
 	 */
 	public static function set_gateway_settings( $gateway_slug, array $settings ) {
-		if ( isset( $settings['password'] ) && '' !== $settings['password'] ) {
-			$settings['password'] = Secret_Crypt::encrypt( $settings['password'] );
+		if ( isset( $settings['password'] ) && '' !== (string) $settings['password'] ) {
+			if ( ! Secret_Crypt::is_current_format( $settings['password'] ) ) {
+				$encrypted = Secret_Crypt::encrypt( (string) $settings['password'] );
+				if ( false === $encrypted ) {
+					// Never downgrade to plaintext when the deployment has not
+					// supplied NOVIN_COMMERCE_ENCRYPTION_KEY or OpenSSL failed.
+					return false;
+				}
+				$settings['password'] = $encrypted;
+			}
 		}
 
-		$all_gateways                   = self::get( 'sms_gateways', [] );
-		$all_gateways                   = is_array( $all_gateways ) ? $all_gateways : [];
-		$all_gateways[ $gateway_slug ]  = $settings;
+		$all_gateways                  = self::get( 'sms_gateways', [] );
+		$all_gateways                  = is_array( $all_gateways ) ? $all_gateways : [];
+		$all_gateways[ $gateway_slug ] = $settings;
 
 		return self::set( 'sms_gateways', $all_gateways );
 	}

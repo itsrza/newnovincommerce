@@ -1,9 +1,10 @@
 <?php
 
-namespace Novinwp\Novin_Commerce\Common;
+namespace MobinDev\Novin_Commerce\Common;
 
-use Novinwp\Novin_Commerce\Models\Sync as SyncModel;
-use Novinwp\Novin_Commerce\Plugin;
+use MobinDev\Novin_Commerce\Models\Sync as SyncModel;
+use MobinDev\Novin_Commerce\Common\Accounting\Product_Health_Snapshot;
+use MobinDev\Novin_Commerce\Plugin;
 
 class Sync {
 	/**
@@ -40,7 +41,6 @@ class Sync {
 		$this->plugin->get_loader()->add_action( 'profile_update', $this, 'userAddOrUpdate', 11, 2 );
 		//orders
 
-		$this->plugin->get_loader()->add_action( 'save_post_shop_order', $this, 'orderAddOrUpdate', 11, 3 );
 		$this->plugin->get_loader()->add_action( 'woocommerce_order_status_pending', $this, 'orderUpdateStatus', 11, 2 );
 		$this->plugin->get_loader()->add_action( 'woocommerce_order_status_failed', $this, 'orderUpdateStatus', 11, 2 );
 		$this->plugin->get_loader()->add_action( 'woocommerce_order_status_on-hold', $this, 'orderUpdateStatus', 11, 2 );
@@ -74,6 +74,7 @@ class Sync {
 	 */
 	public function productAddOrUpdate( $post_ID, $post, $update ) {
 		SyncModel::insertProduct( $post_ID );
+		Product_Health_Snapshot::rebuild( $post_ID, 'product' );
 	}
 
 	/**
@@ -82,6 +83,7 @@ class Sync {
 	 */
 	public function productUpdate( $product_id, $product ) {
 		SyncModel::insertProduct( $product_id );
+		Product_Health_Snapshot::rebuild( $product_id, 'product' );
 	}
 
 	/*** Order ***/
@@ -124,6 +126,7 @@ class Sync {
 	 */
 	public function variationAddOrUpdate( $post_ID, $post, $update ) {
 		SyncModel::insertVariation( $post_ID );
+		Product_Health_Snapshot::rebuild( $post_ID, 'variation' );
 	}
 
 	/**
@@ -132,6 +135,7 @@ class Sync {
 	 */
 	public function variationUpdate( $variation_id, $variation ) {
 		SyncModel::insertVariation( $variation_id );
+		Product_Health_Snapshot::rebuild( $variation_id, 'variation' );
 	}
 
 	/*** user ***/

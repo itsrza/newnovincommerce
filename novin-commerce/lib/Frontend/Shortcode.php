@@ -304,7 +304,7 @@ class Shortcode {
 			?>
 			<div class="alert alert-warning text-center" role="alert">
 				حساب کاربری شما در سیستم حسابداری ما تعریف نشده است. لطفا با پشتیبانی سایت تماس بگیرید. (شناسه
-				کاربر: <?php echo $user_id; ?>)
+				کاربر: <?php echo esc_html( $user_id ); ?>)
 			</div>
 			<?php
 			return;
@@ -349,9 +349,7 @@ class Shortcode {
 		} elseif ( $result['response']['code'] !== 200 or empty( $result['body'] ) ) {
 			?>
 			<div class="alert alert-warning text-center" role="alert">
-				<?php
-				$body = json_decode( $result['body'], true );
-				echo $body ? $body['message'] : 'خطای ناشناخته رخ داد!' ?>
+				اطلاعات تراکنش‌ها در دسترس نیست. لطفاً بعداً دوباره تلاش کنید.
 			</div>
 			<?php
 			return;
@@ -374,15 +372,19 @@ class Shortcode {
 					</thead>
 					<tbody>
 					<?php
-					$decoded_result = json_decode( $result['body'] );
-
-					$total_page = (int) $headers['total_pages'];
-					unset( $result, $api_link, $username );
-					//				$transactions = $decoded_result->Items;
-					$transactions = $decoded_result;
+			$decoded_result = json_decode( $result['body'] );
+			$header_total  = isset( $headers['total_pages'] ) && is_scalar( $headers['total_pages'] ) ? $headers['total_pages'] : 1;
+			$total_page    = min( 10000, max( 1, absint( $header_total ) ) );
+			unset( $result, $api_link, $username, $password );
+			// Provider data is treated as untrusted; malformed payloads render an
+			// empty result rather than causing notices or template errors.
+			$transactions = is_array( $decoded_result ) ? $decoded_result : array();
 					//var_dump($transactions);
 					if ( is_array( $transactions ) && count( $transactions ) > 0 ) {
 						foreach ( $transactions as $transaction ) {
+							if ( ! is_object( $transaction ) ) {
+								continue;
+							}
 //						$item = $transaction->Item;
 							$item = $transaction;
 							?>

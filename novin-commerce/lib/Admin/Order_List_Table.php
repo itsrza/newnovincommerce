@@ -41,32 +41,46 @@ class Order_List_Table extends List_Table {
 	public function get_sortable_columns() {
 		return [
 			'id'        => array( 'id', true ),
-			'name'      => 'name',
-			'total'     => 'total',
-			'user'      => 'user',
-			'guid'      => 'guid',
-			'sync_date' => 'sync_date',
-
+			'name'      => array( 'name', true ),
+			'total'     => array( 'total', false ),
+			'user'      => array( 'user', false ),
+			'guid'      => array( 'guid', false ),
+			'sync_date' => array( 'sync_date', false ),
 		];
 	}
 
 
 	public function fetchTableData() {
-		$query_args = [];
-		$search     = isset( $_REQUEST['s'] ) ? wp_unslash( trim( $_REQUEST['s'] ) ) : null;
-
-		if ( $search ) {
-			$query_args['like_name'] = $search;
-		}
-
-		$query = new \WC_Order_Query(
-			array_merge(
-				[ 'limit' => - 1 ],
-				$query_args
-			)
+		$search       = isset( $_REQUEST['s'] ) ? sanitize_text_field( wp_unslash( trim( (string) $_REQUEST['s'] ) ) ) : '';
+		$per_page     = min( 100, max( 1, (int) $this->get_items_per_page( 'per_page', 20 ) ) );
+		$current_page = max( 1, (int) $this->get_pagenum() );
+		$requested_orderby = isset( $_REQUEST['orderby'] ) ? sanitize_key( wp_unslash( $_REQUEST['orderby'] ) ) : 'id';
+		$requested_order   = isset( $_REQUEST['order'] ) && 'asc' === strtolower( (string) wp_unslash( $_REQUEST['order'] ) ) ? 'ASC' : 'DESC';
+		$order_map         = array( 'id' => 'ID', 'name' => 'date', 'total' => 'total', 'user' => 'customer_id' );
+		$query_args   = array(
+			'limit'    => $per_page,
+			'paged'    => $current_page,
+			'paginate' => true,
+			'orderby'  => $order_map[ $requested_orderby ] ?? 'ID',
+			'order'    => $requested_order,
 		);
-
-		return $query->get_orders();
+		if ( $search ) {
+			// WooCommerce's CRUD query keeps this path HPOS-safe. The wildcard
+			// search is intentionally bounded by the page query above.
+			$query_args['search'] = '*' . $search . '*';
+		}
+		$query  = new \WC_Order_Query( $query_args );
+		$result = $query->get_orders();
+		if ( is_object( $result ) && isset( $result->orders, $result->total ) ) {
+			$this->total_items = (int) $result->total;
+			return (array) $result->orders;
+		}
+		// Older WooCommerce versions may not expose paginate. Keep the page
+		// bounded and make the limitation visible to pagination rather than
+		// loading every order into memory.
+		$orders            = is_array( $result ) ? $result : array();
+		$this->total_items = count( $orders );
+		return $orders;
 	}
 
 	/**

@@ -21,8 +21,19 @@ class NovinCommerce_RolePrice_Admin_Fields {
 		add_action( 'woocommerce_process_product_meta', array( $this, 'save_simple_product_fields' ) );
 
 		add_action( 'woocommerce_save_product_variation', array( $this, 'save_variation_fields' ), 10, 2 );
+		add_action( 'woocommerce_admin_process_product_object', array( $this, 'mark_manual_sale_origin' ), 100, 1 );
+		add_action( 'woocommerce_admin_process_variation_object', array( $this, 'mark_manual_sale_origin' ), 100, 2 );
 
 		add_action( 'admin_head', array( $this, 'admin_styles' ) );
+	}
+
+	public function mark_manual_sale_origin( $product, $loop = null ) {
+		if ( ! is_admin() || ! isset( $_POST ) || ! ( $product instanceof WC_Product ) ) return;
+		if ( 'accounting' === (string) $product->get_meta( '_novin_commerce_sale_origin', true ) ) return;
+		if ( '' !== (string) $product->get_sale_price( 'edit' ) ) {
+			$product->update_meta_data( '_novin_commerce_sale_origin', 'manual' );
+			$product->update_meta_data( '_novin_commerce_sale_state', 'manual' );
+		}
 	}
 
 	public function admin_styles() {
@@ -53,8 +64,8 @@ class NovinCommerce_RolePrice_Admin_Fields {
 	}
 
 	private function to_display_price( $value ) {
-		if ( class_exists( '\\Novinwp\\Novin_Commerce\\Common\\Currency_Conversion' ) ) {
-			return \Novinwp\Novin_Commerce\Common\Currency_Conversion::to_display( $value );
+		if ( class_exists( '\MobinDev\\Novin_Commerce\\Common\\Currency_Conversion' ) ) {
+			return \MobinDev\Novin_Commerce\Common\Currency_Conversion::to_display( $value );
 		}
 		return $value;
 	}
@@ -168,8 +179,8 @@ class NovinCommerce_RolePrice_Admin_Fields {
 			return '';
 		}
 
-		if ( class_exists( '\\Novinwp\\Novin_Commerce\\Common\\Currency_Conversion' ) ) {
-			$formatted = \Novinwp\Novin_Commerce\Common\Currency_Conversion::to_storage( $formatted );
+		if ( class_exists( '\MobinDev\\Novin_Commerce\\Common\\Currency_Conversion' ) ) {
+			$formatted = \MobinDev\Novin_Commerce\Common\Currency_Conversion::to_storage( $formatted );
 		}
 
 		return $formatted;
@@ -194,9 +205,19 @@ class NovinCommerce_RolePrice_Admin_Fields {
 
 			$regular_value = $this->sanitize_price_input( $regular_raw );
 			$sale_value    = $this->sanitize_price_input( $sale_raw );
+			$had_regular   = get_post_meta( $post_id, $regular_key, true );
+			$had_sale      = get_post_meta( $post_id, $sale_key, true );
+			$had_regular   = is_scalar( $had_regular ) ? (string) $had_regular : '';
+			$had_sale      = is_scalar( $had_sale ) ? (string) $had_sale : '';
 
 			update_post_meta( $post_id, $regular_key, $regular_value );
 			update_post_meta( $post_id, $sale_key, $sale_value );
+			// An authenticated admin edit is the explicit manual origin. Do not
+			// claim an entirely empty, never-owned role so a future accounting
+			// import can still create it.
+			if ( '' !== $regular_value || '' !== $sale_value || '' !== (string) $had_regular || '' !== (string) $had_sale ) {
+				NovinCommerce_RolePrice_Roles::set_origin( $post_id, $role_key, 'manual' );
+			}
 			$legacy_prices[ $role_key ] = array(
 				'regular' => $regular_value,
 				'sale'    => $sale_value,

@@ -2,6 +2,8 @@
 
 namespace Novinwp\Novin_Commerce\Admin;
 
+use MobinDev\Novin_Commerce\Common\Accounting\WebPrd\WebPrd_Parser;
+
 if (!defined('ABSPATH')) exit;
 if (!class_exists(__NAMESPACE__ . '\\Mismatch_Page')) {
 
@@ -54,8 +56,11 @@ class Mismatch_Page {
         $rows = get_transient(self::ROWS_TRANSIENT);
 
         if ($rows === false) {
-            $rows = $wpdb->get_results("
-                SELECT p.ID, p.post_title, p.post_type, m.meta_value AS guid
+            // Keep the diagnostic page bounded. The count card above still
+            // reports the complete duplicate-group count; this view shows
+            // the first 100 rows and avoids loading an entire catalog into PHP.
+            $rows = $wpdb->get_results(
+                "SELECT p.ID, p.post_title, p.post_type, m.meta_value AS guid
                 FROM {$wpdb->posts} p
                 INNER JOIN {$wpdb->postmeta} m ON p.ID = m.post_id
                 INNER JOIN (
@@ -67,8 +72,9 @@ class Mismatch_Page {
                     HAVING COUNT(*) > 1
                 ) d ON d.meta_value = m.meta_value
                 WHERE m.meta_key = 'guid'
-                ORDER BY m.meta_value
-            ");
+                ORDER BY m.meta_value, p.ID
+                LIMIT 100"
+            );
 
             set_transient(self::ROWS_TRANSIENT, $rows, self::CACHE_TTL);
         }
@@ -95,8 +101,8 @@ class Mismatch_Page {
 
         foreach ($rows as $r) {
             $webPrd = get_post_meta($r->ID, 'WebPrd', true);
-            $decoded = json_decode($webPrd, true);
-            $accName = is_array($decoded) && isset($decoded['Name']) ? esc_html($decoded['Name']) : '—';
+            $accName = WebPrd_Parser::from( $webPrd )->catalog()['name'];
+            $accName = '' !== $accName ? esc_html( $accName ) : '—';
 
             $nonce = wp_create_nonce('remove_guid_' . $r->ID);
             $ajax_type = 'product_variation' === $r->post_type ? 'variation' : ( 'shop_order' === $r->post_type ? 'order' : 'product' );

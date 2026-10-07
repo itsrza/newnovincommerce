@@ -1,10 +1,10 @@
 <?php
 
-namespace Novinwp\Novin_Commerce\Digits\Frontend;
+namespace MobinDev\Novin_Commerce\Digits\Frontend;
 
-use Novinwp\Novin_Commerce\Digits\Common\Digits_Settings;
-use Novinwp\Novin_Commerce\Digits\Common\Otp_Manager;
-use Novinwp\Novin_Commerce\Plugin;
+use MobinDev\Novin_Commerce\Digits\Common\Digits_Settings;
+use MobinDev\Novin_Commerce\Digits\Common\Otp_Manager;
+use MobinDev\Novin_Commerce\Plugin;
 
 /**
  * Replaces the default WordPress and WooCommerce login/registration forms
@@ -17,8 +17,6 @@ use Novinwp\Novin_Commerce\Plugin;
 class Mobile_Auth {
 
 	private $plugin;
-	private $woo_buffer_level = null;
-	private $full_page_buffer_level = null;
 
 	public function __construct( Plugin $plugin ) {
 		$this->plugin = $plugin;
@@ -36,21 +34,12 @@ class Mobile_Auth {
 		add_action( 'login_enqueue_scripts', [ $this, 'enqueue_login_assets' ] );
 		add_filter( 'login_body_class', [ $this, 'login_body_class' ] );
 		add_filter( 'login_message', [ $this, 'login_message' ] );
-		// Some themes replace the WooCommerce account template with a block or
-		// a custom page builder. In that case the two WooCommerce form actions
-		// below are never fired; the content fallback keeps the account URL a
-		// usable login/register page instead of showing an unrelated cart.
+		// Custom/block My Account pages can opt into the shortcode; classic
+		// WooCommerce accounts use a template override. Neither path buffers or
+		// rewrites the complete frontend response.
 		add_filter( 'the_content', [ $this, 'replace_account_login_content' ], 999 );
-		// Woodmart Plus and similar builders can print the account template
-		// outside the_content and outside WooCommerce's classic form hooks. Keep
-		// this page-scoped safety net as the final fallback for that case.
-		add_action( 'template_redirect', [ $this, 'start_full_page_capture' ], 0 );
-		add_action( 'shutdown', [ $this, 'finish_full_page_capture' ], 0 );
-
-		// The WooCommerce template renders its default forms between these two
-		// actions. Buffer that output and replace it only when the module is on.
-		add_action( 'woocommerce_before_customer_login_form', [ $this, 'start_woocommerce_capture' ], 1 );
-		add_action( 'woocommerce_after_customer_login_form', [ $this, 'finish_woocommerce_capture' ], 9999 );
+		add_filter( 'woocommerce_locate_template', [ $this, 'locate_account_template' ], 10, 3 );
+		add_action( 'novin_commerce_digits_account_form', [ $this, 'render_account_form' ] );
 	}
 
 	public function enqueue_login_assets() {
@@ -121,120 +110,36 @@ class Mobile_Auth {
 		return $message . $this->render_form( 'wp-login', $redirect_to );
 	}
 
-	public function start_woocommerce_capture() {
-		if ( ! $this->is_enabled() || is_user_logged_in() || null !== $this->woo_buffer_level ) {
-			return;
-		}
-
-		$this->woo_buffer_level = ob_get_level();
-		ob_start();
-	}
-
-	public function finish_woocommerce_capture() {
-		if ( null === $this->woo_buffer_level || ob_get_level() <= $this->woo_buffer_level ) {
-			return;
-		}
-
-		ob_end_clean();
-		$this->woo_buffer_level = null;
-
-		$redirect_to = function_exists( 'wc_get_page_permalink' ) ? wc_get_page_permalink( 'myaccount' ) : '';
-		echo $this->render_form( 'woocommerce', $redirect_to ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped
-	}
-
 	/**
-	 * Start a final, page-level capture for account pages rendered outside the
-	 * normal WordPress/WooCommerce content hooks.
+	 * Replace only WooCommerce's known account-login template. This is a
+	 * targeted template resolution hook, not a response buffer or full-page
+	 * rewrite, and it remains compatible with HPOS because it is presentation
+	 * only.
 	 *
-	 * @return void
-	 */
-	public function start_full_page_capture() {
-		if ( ! $this->is_enabled() || is_user_logged_in() || null !== $this->full_page_buffer_level ) {
-			return;
-		}
-		if ( ! function_exists( 'is_account_page' ) || ! is_account_page() ) {
-			return;
-		}
-
-		// Enqueue before wp_head/wp_footer render. This is idempotent when the
-		// normal wp_enqueue_scripts hook already queued the Digits assets.
-		$this->enqueue_assets();
-		$this->full_page_buffer_level = ob_get_level();
-		ob_start();
-	}
-
-	/**
-	 * Finish the page-level capture and replace an account page that never
-	 * rendered the Digits form. This covers builders such as Woodmart Plus
-	 * that print an empty-cart template directly during page rendering.
-	 *
-	 * @return void
-	 */
-	public function finish_full_page_capture() {
-		if ( null === $this->full_page_buffer_level ) {
-			return;
-		}
-
-		$html = '';
-		while ( ob_get_level() > $this->full_page_buffer_level ) {
-			$chunk = ob_get_clean();
-			if ( false === $chunk ) {
-				break;
-			}
-			// Inner buffers contain the later part of the document; prepend
-			// each outer buffer so the original output order is preserved.
-			$html = $chunk . $html;
-		}
-		$this->full_page_buffer_level = null;
-
-		if ( false !== strpos( $html, 'novin-digits-auth' ) ) {
-			echo $html; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped
-			return;
-		}
-
-		$redirect_to = function_exists( 'wc_get_page_permalink' ) ? wc_get_page_permalink( 'myaccount' ) : home_url( '/' );
-		$form         = $this->render_form( 'woocommerce-fallback', $redirect_to );
-		$form        .= $this->render_full_page_assets();
-		$body_matches = 0;
-		$updated_html  = preg_replace_callback(
-			'~(<body\b[^>]*>).*?(</body\s*>)~is',
-			static function ( $matches ) use ( $form ) {
-				return $matches[1] . $form . $matches[2];
-			},
-			$html,
-			1,
-			$body_matches
-		);
-
-		if ( 1 === $body_matches && is_string( $updated_html ) ) {
-			echo $updated_html; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped
-			return;
-		}
-
-		// Last-resort fallback for a non-standard response without body tags.
-		echo $form . $html; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped
-	}
-
-	/**
-	 * Re-emit the assets because the full-page fallback replaces the body and
-	 * can therefore remove scripts normally printed by wp_footer.
-	 *
+	 * @param string $template      Resolved template path.
+	 * @param string $template_name Requested WooCommerce template name.
+	 * @param string $template_path WooCommerce template path (unused).
 	 * @return string
 	 */
-	private function render_full_page_assets() {
-		$style_url  = add_query_arg( 'ver', $this->plugin->get_version(), $this->plugin->getFrontStyleUrl() . 'digits.css' );
-		$script_url = add_query_arg( 'ver', $this->plugin->get_version(), $this->plugin->getFrontScriptUrl() . 'digits.js' );
-		$config     = wp_json_encode(
-			[
-				'ajaxUrl' => admin_url( 'admin-ajax.php' ),
-				'nonce'   => wp_create_nonce( 'novin-digits-auth' ),
-			],
-			JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT
-		);
+	public function locate_account_template( $template, $template_name, $template_path ) {
+		if ( ! $this->is_enabled() || is_user_logged_in() || 'myaccount/form-login.php' !== $template_name ) {
+			return $template;
+		}
 
-		return '<link rel="stylesheet" id="novin-commerce-digits-auth-full-page-css" href="' . esc_url( $style_url ) . '" type="text/css" media="all" />' .
-			'<script id="novin-commerce-digits-auth-full-page-config">window.NovinDigitsAuth=' . $config . ';</script>' .
-			'<script id="novin-commerce-digits-auth-full-page-js" src="' . esc_url( $script_url ) . '"></script>';
+		$override = dirname( $this->plugin->getPluginFile() ) . '/templates/woocommerce/myaccount/form-login.php';
+		return file_exists( $override ) ? $override : $template;
+	}
+
+	/**
+	 * Render the form used by the targeted WooCommerce template override.
+	 *
+	 * @return void
+	 */
+	public function render_account_form() {
+		if ( ! is_user_logged_in() ) {
+			$redirect = function_exists( 'wc_get_page_permalink' ) ? wc_get_page_permalink( 'myaccount' ) : home_url( '/' );
+			echo $this->render_form( 'woocommerce-template', $redirect ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped
+		}
 	}
 
 	/**
@@ -302,7 +207,8 @@ class Mobile_Auth {
 		$code  = isset( $_POST['code'] ) ? (string) wp_unslash( $_POST['code'] ) : '';
 		$mode  = sanitize_key( Digits_Settings::get( 'login_mode', 'otp_only' ) );
 		$mode  = in_array( $mode, [ 'otp_only', 'otp_and_password', 'password_optional_otp', 'unified_form' ], true ) ? $mode : 'otp_only';
-		$password = isset( $_POST['password'] ) ? (string) wp_unslash( $_POST['password'] ) : '';
+		$password   = isset( $_POST['password'] ) ? (string) wp_unslash( $_POST['password'] ) : '';
+		$remember_me = ! empty( $_POST['remember_me'] ) && '0' !== (string) $_POST['remember_me'];
 
 		if ( ! $this->is_valid_phone( $phone ) || ! preg_match( '/^[0-9]{4,8}$/', $code ) ) {
 			wp_send_json_error( [ 'message' => 'شماره موبایل یا کد تأیید معتبر نیست.' ], 400 );
@@ -333,7 +239,7 @@ class Mobile_Auth {
 				wp_send_json_error( [ 'message' => 'کد تأیید قبلاً مصرف شده است. لطفاً کد جدیدی درخواست کنید.' ], 409 );
 			}
 
-			$this->log_user_in( $user );
+			$this->log_user_in( $user, $remember_me );
 			wp_send_json_success(
 				[
 					'message'  => 'ورود با موفقیت انجام شد.',
@@ -370,7 +276,7 @@ class Mobile_Auth {
 			wp_send_json_error( [ 'message' => 'ساخت حساب کاربری ناموفق بود.' ], 500 );
 		}
 
-		$this->log_user_in( $user );
+		$this->log_user_in( $user, $remember_me );
 		wp_send_json_success(
 			[
 				'message'  => 'ثبت‌نام و ورود با موفقیت انجام شد.',
@@ -482,9 +388,11 @@ class Mobile_Auth {
 		return strlen( $password ) >= 8 && preg_match( '/[A-Za-z]/', $password ) && preg_match( '/[0-9]/', $password );
 	}
 
-	private function log_user_in( \WP_User $user ) {
+	private function log_user_in( \WP_User $user, $remember = false ) {
 		wp_set_current_user( $user->ID );
-		wp_set_auth_cookie( $user->ID, true );
+		// A persistent cookie is opt-in; the previous implementation always
+		// created a long-lived session even when the visitor did not ask for it.
+		wp_set_auth_cookie( $user->ID, (bool) $remember );
 		do_action( 'wp_login', $user->user_login, $user );
 	}
 
@@ -530,42 +438,30 @@ class Mobile_Auth {
 		$registration_enabled = 'on' === Digits_Settings::get( 'registration_enabled', 'on' );
 		$mode_label = 'unified_form' === $mode ? 'ورود و ثبت‌نام با شماره موبایل' : 'ورود با شماره موبایل';
 
-		ob_start();
-		?>
-		<div id="<?php echo esc_attr( $id ); ?>" class="novin-digits-auth" dir="rtl"
-			data-login-mode="<?php echo esc_attr( $mode ); ?>"
-			data-redirect-to="<?php echo esc_attr( $redirect_to ); ?>"
-			data-registration-enabled="<?php echo $registration_enabled ? '1' : '0'; ?>">
-			<div class="novin-digits-auth-card">
-				<h2><?php echo esc_html( $mode_label ); ?></h2>
-				<p class="novin-digits-auth-description">شماره موبایل خود را وارد کنید تا کد تأیید برای شما ارسال شود.</p>
-				<form class="novin-digits-auth-form" novalidate>
-					<div class="novin-digits-honeypot" aria-hidden="true" style="position:absolute;left:-10000px;width:1px;height:1px;overflow:hidden;">
-						<label for="<?php echo esc_attr( $id . '-website' ); ?>">وب‌سایت</label>
-						<input id="<?php echo esc_attr( $id . '-website' ); ?>" name="novin_website" type="text" tabindex="-1" autocomplete="off">
-					</div>
-					<div class="novin-digits-auth-phone-step">
-						<label for="<?php echo esc_attr( $id . '-phone' ); ?>">شماره موبایل</label>
-						<input id="<?php echo esc_attr( $id . '-phone' ); ?>" name="phone" type="tel" inputmode="tel" autocomplete="tel" dir="ltr" placeholder="09123456789" required>
-						<?php if ( $password_mode ) : ?>
-							<label for="<?php echo esc_attr( $id . '-password' ); ?>">رمز عبور<?php echo 'password_optional_otp' === $mode ? ' (اختیاری)' : ''; ?></label>
-							<input id="<?php echo esc_attr( $id . '-password' ); ?>" name="password" type="password" autocomplete="current-password" dir="ltr" <?php echo 'otp_and_password' === $mode ? 'required' : ''; ?>>
-						<?php endif; ?>
-						<button type="submit" class="button button-primary novin-digits-request-button">دریافت کد تأیید</button>
-					</div>
-					<div class="novin-digits-auth-otp-step" hidden>
-						<label for="<?php echo esc_attr( $id . '-code' ); ?>">کد تأیید پیامک‌شده</label>
-						<input id="<?php echo esc_attr( $id . '-code' ); ?>" name="code" type="text" inputmode="numeric" autocomplete="one-time-code" dir="ltr" maxlength="8" pattern="[0-9]{4,8}">
-						<button type="submit" class="button button-primary novin-digits-verify-button">تأیید و ادامه</button>
-						<button type="button" class="button-link novin-digits-resend-button">ارسال مجدد</button>
-						<span class="novin-digits-countdown" aria-live="polite"></span>
-					</div>
-					<div class="novin-digits-auth-message" role="alert" aria-live="polite"></div>
-				</form>
-				<noscript>برای استفاده از ورود با شماره موبایل، اجرای JavaScript باید فعال باشد.</noscript>
-			</div>
-		</div>
-		<?php
-		return (string) ob_get_clean();
+		// Build only this component's string. The page response is never
+		// captured, replaced, or emitted through a shutdown callback.
+		$html  = '<div id="' . esc_attr( $id ) . '" class="novin-digits-auth" dir="rtl" data-login-mode="' . esc_attr( $mode ) . '" data-redirect-to="' . esc_attr( $redirect_to ) . '" data-registration-enabled="' . ( $registration_enabled ? '1' : '0' ) . '">';
+		$html .= '<div class="novin-digits-auth-card">';
+		$html .= '<h2>' . esc_html( $mode_label ) . '</h2>';
+		$html .= '<p class="novin-digits-auth-description">شماره موبایل خود را وارد کنید تا کد تأیید برای شما ارسال شود.</p>';
+		$html .= '<form class="novin-digits-auth-form" novalidate>';
+		$html .= '<div class="novin-digits-honeypot" aria-hidden="true" style="position:absolute;left:-10000px;width:1px;height:1px;overflow:hidden;">';
+		$html .= '<label for="' . esc_attr( $id . '-website' ) . '">وب‌سایت</label>';
+		$html .= '<input id="' . esc_attr( $id . '-website' ) . '" name="novin_website" type="text" tabindex="-1" autocomplete="off">';
+		$html .= '</div><div class="novin-digits-auth-phone-step">';
+		$html .= '<label for="' . esc_attr( $id . '-phone' ) . '">شماره موبایل</label>';
+		$html .= '<input id="' . esc_attr( $id . '-phone' ) . '" name="phone" type="tel" inputmode="tel" autocomplete="tel" dir="ltr" placeholder="09123456789" required>';
+		if ( $password_mode ) {
+			$html .= '<label for="' . esc_attr( $id . '-password' ) . '">رمز عبور' . ( 'password_optional_otp' === $mode ? ' (اختیاری)' : '' ) . '</label>';
+			$html .= '<input id="' . esc_attr( $id . '-password' ) . '" name="password" type="password" autocomplete="current-password" dir="ltr"' . ( 'otp_and_password' === $mode ? ' required' : '' ) . '>';
+		}
+		$html .= '<label class="novin-digits-remember"><input name="remember_me" type="checkbox" value="1"> مرا به خاطر بسپار</label>';
+		$html .= '<button type="submit" class="button button-primary novin-digits-request-button">دریافت کد تأیید</button></div>';
+		$html .= '<div class="novin-digits-auth-otp-step" hidden><label for="' . esc_attr( $id . '-code' ) . '">کد تأیید پیامک‌شده</label>';
+		$html .= '<input id="' . esc_attr( $id . '-code' ) . '" name="code" type="text" inputmode="numeric" autocomplete="one-time-code" dir="ltr" maxlength="8" pattern="[0-9]{4,8}">';
+		$html .= '<button type="submit" class="button button-primary novin-digits-verify-button">تأیید و ادامه</button><button type="button" class="button-link novin-digits-resend-button">ارسال مجدد</button><span class="novin-digits-countdown" aria-live="polite"></span></div>';
+		$html .= '<div class="novin-digits-auth-message" role="alert" aria-live="polite"></div></form><noscript>برای استفاده از ورود با شماره موبایل، اجرای JavaScript باید فعال باشد.</noscript></div></div>';
+		return $html;
 	}
+
 }

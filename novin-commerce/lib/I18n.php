@@ -13,7 +13,7 @@
  * @subpackage Novin_Commerce/includes
  */
 
-namespace Novinwp\Novin_Commerce;
+namespace MobinDev\Novin_Commerce;
 
 /**
  * Define the internationalization functionality.
@@ -24,7 +24,7 @@ namespace Novinwp\Novin_Commerce;
  * @since      1.0.0
  * @package    Novin_Commerce
  * @subpackage Novin_Commerce/includes
- * @author     Novinwp <info@npwp.ir>
+ * @author     MobinDev <mobin7332@gmail.com>
  */
 class I18n {
 

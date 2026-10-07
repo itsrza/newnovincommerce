@@ -1,8 +1,8 @@
 <?php
 
-namespace Novinwp\Novin_Commerce\Digits\Common;
+namespace MobinDev\Novin_Commerce\Digits\Common;
 
-use Novinwp\Novin_Commerce\Common\Text_Encoding;
+use MobinDev\Novin_Commerce\Common\Text_Encoding;
 
 /**
  * Records every SMS send attempt (OTP or otherwise) so the admin settings
@@ -26,10 +26,15 @@ class Sms_Log {
 			self::table(),
 			[
 				'gateway'      => sanitize_key( $gateway ),
-				'phone'        => sanitize_text_field( $phone ),
+				// Keep only a masked destination in the operational log. The
+				// canonical phone and OTP remain outside this log table.
+				'phone'        => self::mask_phone( sanitize_text_field( $phone ) ),
 				'status'       => $status,
 				'message'      => sanitize_textarea_field( Text_Encoding::normalize( $message ) ),
-				'raw_response' => sanitize_textarea_field( Text_Encoding::normalize( $raw_response ) ),
+				// Provider responses are untrusted and can echo credentials or
+				// request data. The argument is retained for API compatibility,
+				// but is deliberately never persisted.
+				'raw_response' => '',
 				'created_at'   => current_time( 'mysql', true ),
 			],
 			[ '%s', '%s', '%s', '%s', '%s', '%s' ]
@@ -52,7 +57,9 @@ class Sms_Log {
 				$row->message = Text_Encoding::normalize( $row->message );
 			}
 			if ( isset( $row->raw_response ) ) {
-				$row->raw_response = Text_Encoding::normalize( $row->raw_response );
+				// Legacy rows may contain a provider payload. Never expose it
+				// through the admin/API reader, even before migration cleanup.
+				$row->raw_response = '';
 			}
 		}
 		return $rows;
@@ -60,6 +67,9 @@ class Sms_Log {
 
 	private static function mask_phone( $phone ) {
 		$phone = (string) $phone;
+		if ( 0 === strpos( $phone, '***' ) ) {
+			return substr( $phone, 0, 5 );
+		}
 		$length = strlen( $phone );
 		if ( $length <= 4 ) {
 			return str_repeat( '*', $length );

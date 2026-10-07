@@ -10,7 +10,7 @@
  * @subpackage Novin_Commerce/includes
  */
 
-namespace Novinwp\Novin_Commerce;
+namespace MobinDev\Novin_Commerce;
 
 /**
  * Fired during plugin deactivation.
@@ -20,7 +20,7 @@ namespace Novinwp\Novin_Commerce;
  * @since      1.0.0
  * @package    Novin_Commerce
  * @subpackage Novin_Commerce/includes
- * @author     Novinwp <info@npwp.ir>
+ * @author     MobinDev <mobin7332@gmail.com>
  */
 class Deactivator {
 
@@ -33,6 +33,9 @@ class Deactivator {
 	 */
 	public static function deactivate() {
 		Activator::unscheduleMaintenance();
+		if ( function_exists( 'wp_clear_scheduled_hook' ) ) {
+			wp_clear_scheduled_hook( 'novin_commerce_run_migration' );
+		}
 	}
 
 }

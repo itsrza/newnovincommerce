@@ -1,13 +1,13 @@
 <?php
 
-namespace Novinwp\Novin_Commerce\Digits\Admin;
+namespace MobinDev\Novin_Commerce\Digits\Admin;
 
-use Novinwp\Novin_Commerce\Digits\Common\Digits_Settings;
-use Novinwp\Novin_Commerce\Digits\Common\Otp_Manager;
-use Novinwp\Novin_Commerce\Digits\Common\Sms_Log;
-use Novinwp\Novin_Commerce\Digits\SmsGateways\Gateway_Registry;
-use Novinwp\Novin_Commerce\Common\Text_Encoding;
-use Novinwp\Novin_Commerce\Plugin;
+use MobinDev\Novin_Commerce\Digits\Common\Digits_Settings;
+use MobinDev\Novin_Commerce\Digits\Common\Otp_Manager;
+use MobinDev\Novin_Commerce\Digits\Common\Sms_Log;
+use MobinDev\Novin_Commerce\Digits\SmsGateways\Gateway_Registry;
+use MobinDev\Novin_Commerce\Common\Text_Encoding;
+use MobinDev\Novin_Commerce\Plugin;
 
 /**
  * Settings page for the Digits (mobile signup/login) module.
@@ -60,9 +60,13 @@ class Digits_Setting_Menu {
 			// All settings tabs are rendered in the same form. Save the complete
 			// form together so values entered on another tab are not lost.
 			$this->save_general_tab( false );
-			$this->save_sms_tab( false );
+			$sms_saved = $this->save_sms_tab( false );
 			$this->save_woocommerce_tab( false );
-			\Novinwp\Novin_Commerce\Admin\AdminNotice::addSuccessDismissible( 'تنظیمات ذخیره شد.', 2 );
+			if ( false === $sms_saved ) {
+				\MobinDev\Novin_Commerce\Admin\AdminNotice::addErrorDismissible( 'تنظیمات پیامک ذخیره نشد؛ کلید NOVIN_COMMERCE_ENCRYPTION_KEY در wp-config.php یا محیط اجرا تنظیم نشده است.', 2 );
+			} else {
+				\MobinDev\Novin_Commerce\Admin\AdminNotice::addSuccessDismissible( 'تنظیمات ذخیره شد.', 2 );
+			}
 		}
 
 		wp_safe_redirect( add_query_arg( 'tab', in_array( $tab, [ 'general', 'sms', 'woocommerce', 'logs' ], true ) ? $tab : 'general', admin_url( 'admin.php?page=novin-commerce-digits' ) ) );
@@ -80,7 +84,6 @@ class Digits_Setting_Menu {
 
 		Digits_Settings::set( 'registration_enabled', isset( $_POST['registration_enabled'] ) ? 'on' : 'off' );
 		Digits_Settings::set( 'require_strong_password', isset( $_POST['require_strong_password'] ) ? 'on' : 'off' );
-		Digits_Settings::set( 'captcha_enabled', isset( $_POST['captcha_enabled'] ) ? 'on' : 'off' );
 
 		if ( isset( $_POST['default_country_code'] ) ) {
 			$cc = preg_replace( '/[^0-9]/', '', wp_unslash( $_POST['default_country_code'] ) );
@@ -108,11 +111,12 @@ class Digits_Setting_Menu {
 		}
 
 		if ( $show_notice ) {
-			\Novinwp\Novin_Commerce\Admin\AdminNotice::addSuccessDismissible( 'تنظیمات عمومی ذخیره شد.', 2 );
+			\MobinDev\Novin_Commerce\Admin\AdminNotice::addSuccessDismissible( 'تنظیمات عمومی ذخیره شد.', 2 );
 		}
 	}
 
 	private function save_sms_tab( $show_notice = true ) {
+		$saved = true;
 		if ( isset( $_POST['active_sms_gateway'] ) ) {
 				$slug = sanitize_key( wp_unslash( $_POST['active_sms_gateway'] ) );
 				if ( '' === $slug || Gateway_Registry::get( $slug ) ) {
@@ -139,7 +143,7 @@ class Digits_Setting_Menu {
 					// not forced to re-enter it every time they change an
 									// unrelated setting on this tab).
 									if ( '' === trim( (string) $raw ) || self::PASSWORD_MASK === trim( (string) $raw ) ) {
-										$existing = Digits_Settings::get_gateway_settings( $slug );
+										$existing = Digits_Settings::get_gateway_storage_settings( $slug );
 							$field_values[ $field['key'] ] = $existing[ $field['key'] ] ?? '';
 							continue;
 						}
@@ -148,14 +152,20 @@ class Digits_Setting_Menu {
 				$field_values[ $field['key'] ] = sanitize_text_field( $raw );
 			}
 
-			if ( ! empty( $field_values ) ) {
-				Digits_Settings::set_gateway_settings( $slug, $field_values );
+			if ( ! empty( $field_values ) && ! Digits_Settings::set_gateway_settings( $slug, $field_values ) ) {
+				$saved = false;
 			}
 		}
 
 		if ( $show_notice ) {
-			\Novinwp\Novin_Commerce\Admin\AdminNotice::addSuccessDismissible( 'تنظیمات پیامک ذخیره شد.', 2 );
+			if ( $saved ) {
+				\MobinDev\Novin_Commerce\Admin\AdminNotice::addSuccessDismissible( 'تنظیمات پیامک ذخیره شد.', 2 );
+			} else {
+				\MobinDev\Novin_Commerce\Admin\AdminNotice::addErrorDismissible( 'تنظیمات پیامک ذخیره نشد؛ کلید رمزنگاری در محیط اجرا تنظیم نشده است.', 2 );
+			}
 		}
+
+		return $saved;
 	}
 
 	private function save_woocommerce_tab( $show_notice = true ) {
@@ -170,7 +180,7 @@ class Digits_Setting_Menu {
 		}
 
 		if ( $show_notice ) {
-			\Novinwp\Novin_Commerce\Admin\AdminNotice::addSuccessDismissible( 'تنظیمات ووکامرس ذخیره شد.', 2 );
+			\MobinDev\Novin_Commerce\Admin\AdminNotice::addSuccessDismissible( 'تنظیمات ووکامرس ذخیره شد.', 2 );
 		}
 	}
 
@@ -200,7 +210,7 @@ class Digits_Setting_Menu {
 
 		$result = $gateway->send( $phone, $message, $settings );
 
-		\Novinwp\Novin_Commerce\Digits\Common\Sms_Log::add(
+		\MobinDev\Novin_Commerce\Digits\Common\Sms_Log::add(
 			$gateway_slug,
 			$phone,
 			$result['success'] ? 'success' : 'error',
@@ -209,10 +219,10 @@ class Digits_Setting_Menu {
 		);
 
 		if ( $result['success'] ) {
-			wp_send_json_success( [ 'message' => $result['message'], 'raw' => $result['raw'] ?? '' ] );
+			wp_send_json_success( [ 'message' => $result['message'] ] );
 		}
 
-		wp_send_json_error( [ 'message' => $result['message'], 'raw' => $result['raw'] ?? '' ] );
+		wp_send_json_error( [ 'message' => $result['message'] ], 502 );
 	}
 
 	/**
@@ -259,7 +269,6 @@ class Digits_Setting_Menu {
 					break;
 				case 'registration_enabled':
 				case 'require_strong_password':
-				case 'captcha_enabled':
 					Digits_Settings::set( $field, 'on' === $value ? 'on' : 'off' );
 					break;
 				case 'default_country_code':
@@ -335,8 +344,12 @@ class Digits_Setting_Menu {
 					return new \WP_Error( 'invalid_field', 'فیلد درگاه پیامکی معتبر نیست.' );
 				}
 
-				$settings = Digits_Settings::get_gateway_settings( $slug );
+				$settings = Digits_Settings::get_gateway_storage_settings( $slug );
 					if ( 'password' === $field_definition['type'] && ( '' === trim( $value ) || self::PASSWORD_MASK === trim( $value ) ) ) {
+						$stored = Digits_Settings::get_gateway_storage_settings( $slug );
+						if ( ! empty( $stored['password'] ) && ! \MobinDev\Novin_Commerce\Digits\Common\Secret_Crypt::is_current_format( $stored['password'] ) && ! Digits_Settings::set_gateway_settings( $slug, $stored ) ) {
+							return new \WP_Error( 'encryption_unavailable', 'تنظیمات ذخیره نشد؛ کلید رمزنگاری در محیط اجرا تنظیم نشده است.' );
+						}
 						return [
 							'password_stored'    => Digits_Settings::gateway_has_password( $slug ),
 							'password_preserved' => true,
@@ -344,7 +357,9 @@ class Digits_Setting_Menu {
 					}
 
 					$settings[ $field_key ] = sanitize_text_field( $value );
-					Digits_Settings::set_gateway_settings( $slug, $settings );
+					if ( ! Digits_Settings::set_gateway_settings( $slug, $settings ) ) {
+						return new \WP_Error( 'encryption_unavailable', 'تنظیمات ذخیره نشد؛ کلید رمزنگاری در محیط اجرا تنظیم نشده است.' );
+					}
 					return [
 						'password_stored'    => 'password' === $field_definition['type'],
 						'password_preserved' => false,
@@ -476,10 +491,6 @@ class Digits_Setting_Menu {
 								<td><label><input type="checkbox" id="require_strong_password" name="require_strong_password" <?php checked( Digits_Settings::get( 'require_strong_password', 'off' ), 'on' ); ?>> فعال باشد</label></td>
 							</tr>
 							<tr>
-								<th><label for="captcha_enabled">کپچا در فرم‌ها</label></th>
-								<td><label><input type="checkbox" id="captcha_enabled" name="captcha_enabled" <?php checked( Digits_Settings::get( 'captcha_enabled', 'off' ), 'on' ); ?>> فعال باشد</label></td>
-							</tr>
-							<tr>
 								<th><label for="default_country_code">کد کشور پیش‌فرض</label></th>
 								<td><input class="regular-text" type="text" id="default_country_code" name="default_country_code" value="<?php echo esc_attr( Digits_Settings::get( 'default_country_code', '98' ) ); ?>"><p class="description">بدون علامت +. برای ایران: 98</p></td>
 							</tr>
@@ -539,20 +550,19 @@ class Digits_Setting_Menu {
 							<h3><?php echo esc_html( $gateway->get_label() ); ?></h3>
 							<table class="form-table" role="presentation">
 								<?php
-								$gw_settings = Digits_Settings::get_gateway_settings( $slug );
+								$gw_settings = Digits_Settings::get_gateway_storage_settings( $slug );
 								foreach ( $gateway->get_settings_fields() as $field ) :
-										$field_id  = 'gateway_' . $slug . '_' . $field['key'];
-										$value     = $gw_settings[ $field['key'] ] ?? $field['default'];
-											// This field is intentionally plain text: the administrator
-											// requested seeing the exact gateway password while entering
-											// it and after the settings page is refreshed.
-											$display_value = $value;
-											$input_type = 'text';
+										$field_id      = 'gateway_' . $slug . '_' . $field['key'];
+										$is_password   = 'password' === $field['type'];
+										$has_password  = $is_password && Digits_Settings::gateway_has_password( $slug );
+										$value         = $gw_settings[ $field['key'] ] ?? $field['default'];
+										$display_value = $is_password ? ( $has_password ? self::PASSWORD_MASK : '' ) : $value;
+										$input_type    = $is_password ? 'password' : 'text';
 									?>
 									<tr>
 										<th><label for="<?php echo esc_attr( $field_id ); ?>"><?php echo esc_html( $field['label'] ); ?></label></th>
 										<td>
-													<input class="regular-text" type="<?php echo esc_attr( $input_type ); ?>" id="<?php echo esc_attr( $field_id ); ?>" name="<?php echo esc_attr( $field_id ); ?>" value="<?php echo esc_attr( $display_value ); ?>" data-password-field="<?php echo 'password' === $field['type'] ? '1' : '0'; ?>" data-password-masked="0" autocomplete="off" placeholder="<?php echo 'password' === $field['type'] ? 'برای تغییر وارد کنید؛ برای حفظ مقدار فعلی خالی بگذارید' : ''; ?>">
+													<input class="regular-text" type="<?php echo esc_attr( $input_type ); ?>" id="<?php echo esc_attr( $field_id ); ?>" name="<?php echo esc_attr( $field_id ); ?>" value="<?php echo esc_attr( $display_value ); ?>" data-password-field="<?php echo $is_password ? '1' : '0'; ?>" data-password-masked="<?php echo $has_password ? '1' : '0'; ?>" autocomplete="new-password" placeholder="<?php echo $is_password ? 'برای تغییر وارد کنید؛ برای حفظ مقدار فعلی خالی بگذارید' : ''; ?>">
 											<?php if ( ! empty( $field['description'] ) && 'password' !== $field['type'] ) : ?>
 												<p class="description"><?php echo esc_html( $field['description'] ); ?></p>
 											<?php endif; ?>
@@ -668,9 +678,8 @@ class Digits_Setting_Menu {
 			});
 			})();
 
-			// Save each setting as soon as its field loses focus. The password
-			// field intentionally stays as plain text so the administrator can
-			// verify exactly what was entered.
+			// Save settings after a field changes. Password inputs are masked;
+			// focusing a masked field clears it so a new value can be entered.
 			(function(){
 				var toast = document.getElementById('novin-digits-save-toast');
 				var toastTimer = null;
@@ -722,9 +731,9 @@ class Digits_Setting_Menu {
 									return;
 								}
 								if ('1' === field.getAttribute('data-password-field') && response.data && response.data.password_stored) {
-									// Keep the exact text in the field after an autosave.
-									// The field is deliberately type=text by user request.
-									field.setAttribute('data-password-masked', '0');
+									// Never place the credential back in the DOM after save.
+									field.value = <?php echo wp_json_encode( self::PASSWORD_MASK ); ?>;
+									field.setAttribute('data-password-masked', '1');
 								}
 							showToast('ذخیره شد.', false);
 					})

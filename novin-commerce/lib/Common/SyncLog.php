@@ -7,7 +7,8 @@ class SyncLog {
         $table = $wpdb->prefix . 'novin_commerce_sync_logs';
         $allowed = [ 'info', 'success', 'warning', 'error' ];
         $status = in_array( $status, $allowed, true ) ? $status : 'info';
-        $context_json = ! empty( $context ) ? wp_json_encode( $context, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES ) : null;
+        $safe_context  = self::safe_context( $context );
+        $context_json = ! empty( $safe_context ) ? wp_json_encode( $safe_context, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES ) : null;
         return $wpdb->insert(
             $table,
             [
@@ -21,6 +22,33 @@ class SyncLog {
             ],
             [ '%s', '%s', '%s', '%d', '%s', '%s', '%s' ]
         );
+    }
+
+    /**
+     * Keep operational context useful without allowing credentials, tokens,
+     * OTPs or provider payloads into the database/log UI.
+     *
+     * @param mixed $context Context supplied by a caller.
+     * @return array
+     */
+    private static function safe_context( $context ) {
+        if ( ! is_array( $context ) ) {
+            return array();
+        }
+        $safe = array();
+        foreach ( $context as $key => $value ) {
+            $name = strtolower( (string) $key );
+            if ( preg_match( '/(?:pass|secret|token|api|auth|otp|code|key|response|body|phone)/i', $name ) ) {
+                continue;
+            }
+            if ( is_array( $value ) ) {
+                $safe[ sanitize_key( $key ) ] = self::safe_context( $value );
+            } elseif ( is_scalar( $value ) ) {
+                $text = sanitize_text_field( (string) $value );
+                $safe[ sanitize_key( $key ) ] = function_exists( 'mb_substr' ) ? mb_substr( $text, 0, 200 ) : substr( $text, 0, 200 );
+            }
+        }
+        return $safe;
     }
 
     public static function recent( $limit = 10 ) {

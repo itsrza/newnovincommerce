@@ -1,6 +1,6 @@
 <?php
 
-namespace Novinwp\Novin_Commerce\Common;
+namespace MobinDev\Novin_Commerce\Common;
 
 /**
  * Keeps accounting prices in their stored Rial value while exposing an
@@ -28,7 +28,7 @@ final class Currency_Conversion {
 	 * @return void
 	 */
 	public static function boot() {
-		if ( self::$booted || ! class_exists( '\\WooCommerce' ) ) {
+		if ( self::$booted || ! class_exists( '\WooCommerce' ) ) {
 			return;
 		}
 

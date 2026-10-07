@@ -1,13 +1,13 @@
 <?php
 
-namespace Novinwp\Novin_Commerce\Digits;
+namespace MobinDev\Novin_Commerce\Digits;
 
-use Novinwp\Novin_Commerce\Digits\Admin\Digits_Setting_Menu;
-use Novinwp\Novin_Commerce\Digits\Common\Digits_Activator;
-use Novinwp\Novin_Commerce\Digits\Common\Digits_Settings;
-use Novinwp\Novin_Commerce\Digits\Frontend\Mobile_Auth;
-use Novinwp\Novin_Commerce\Digits\Frontend\Woocommerce_Integration;
-use Novinwp\Novin_Commerce\Plugin;
+use MobinDev\Novin_Commerce\Digits\Admin\Digits_Setting_Menu;
+use MobinDev\Novin_Commerce\Digits\Common\Digits_Activator;
+use MobinDev\Novin_Commerce\Digits\Common\Digits_Settings;
+use MobinDev\Novin_Commerce\Digits\Frontend\Mobile_Auth;
+use MobinDev\Novin_Commerce\Digits\Frontend\Woocommerce_Integration;
+use MobinDev\Novin_Commerce\Plugin;
 
 /**
  * Single entry point for the Digits (mobile signup/login) module.
@@ -22,15 +22,20 @@ use Novinwp\Novin_Commerce\Plugin;
 class Digits_Module {
 
 	public static function boot( Plugin $plugin ) {
-		Digits_Activator::maybe_upgrade();
+		// Schema work is never performed during a normal frontend page view.
+		// Activation performs the initial install; later versions retry from
+		// admin_init until every verification step succeeds.
+		if ( is_admin() ) {
+			add_action( 'admin_init', [ Digits_Activator::class, 'maybe_upgrade' ], 1 );
+		}
 
 		$settings_menu = new Digits_Setting_Menu( $plugin );
 		$settings_menu->hooks();
 
 		// Keep the settings page and migration available while the optional
 		// mobile-auth feature is disabled. Do not register frontend auth,
-		// WooCommerce phone filters, AJAX endpoints or page-capture fallbacks
-		// until the site owner explicitly enables Digits.
+		// WooCommerce phone filters or AJAX endpoints until the site owner
+		// explicitly enables Digits.
 		if ( 'on' !== Digits_Settings::get( 'enabled', 'off' ) ) {
 			return;
 		}

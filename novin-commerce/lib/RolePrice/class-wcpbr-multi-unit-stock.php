@@ -3,6 +3,11 @@ if ( ! defined( 'ABSPATH' ) ) {
 exit;
 }
 
+use MobinDev\Novin_Commerce\Common\Accounting\Inventory_Scope;
+use MobinDev\Novin_Commerce\Common\Accounting\Product_Health_Snapshot;
+use MobinDev\Novin_Commerce\Common\Accounting\Unit_Engine;
+use MobinDev\Novin_Commerce\Common\Accounting\WebPrd\WebPrd_Parser;
+
 /**
  * مدیریت موجودی چند-واحدی برای محصولات متغیر.
  *
@@ -42,15 +47,24 @@ const META_BASE_STOCK      = '_wcpbr_base_stock';
 const META_UNITS_PER_PACK  = '_wcpbr_units_per_pack';
 const META_IS_BASE_UNIT    = '_wcpbr_is_base_unit';
 const META_SYNC_MARKER     = '_wcpbr_units_sync_hash';
+const ORDER_REDUCED_META    = '_novin_base_stock_reduced_v1';
+const ORDER_RESTORED_META   = '_novin_base_stock_restored_v1';
+const REFUND_RESTORED_META  = '_novin_base_stock_refund_v1';
+const OPERATION_TABLE_SUFFIX = 'novin_commerce_stock_ops';
 
 public function __construct() {
 // سینک خودکار
 add_action( 'admin_init',                          array( $this, 'maybe_sync_on_admin' ), 20 );
-add_action( 'woocommerce_before_single_product',   array( $this, 'maybe_sync_on_front' ), 20 );
+add_action( 'updated_post_meta',                   array( $this, 'sync_on_accounting_meta' ), 110, 4 );
+add_action( 'added_post_meta',                     array( $this, 'sync_on_accounting_meta' ), 110, 4 );
+// Stock synchronization is explicit/admin or driven by the accounting sync;
+// a frontend product view must never write post meta or product transients.
 
 // کاهش/افزایش موجودی هنگام سفارش
 add_action( 'woocommerce_reduce_order_stock',  array( $this, 'reduce_base_stock_on_order' ), 20, 1 );
 add_action( 'woocommerce_restore_order_stock', array( $this, 'restore_base_stock_on_order' ), 20, 1 );
+add_action( 'woocommerce_order_partially_refunded', array( $this, 'restore_base_stock_on_refund' ), 20, 2 );
+add_action( 'woocommerce_order_fully_refunded', array( $this, 'restore_base_stock_on_refund' ), 20, 2 );
 
 // لایه امنیتی add-to-cart
 add_filter( 'woocommerce_add_to_cart_validation', array( $this, 'validate_add_to_cart' ), 999, 4 );
@@ -64,6 +78,17 @@ add_filter( 'woocommerce_dropdown_variation_attribute_options_args', array( $thi
 
 // 3) در سطح آرایه variation های موجود: variation ناموجود حذف شود
 add_filter( 'woocommerce_get_available_variations', array( $this, 'remove_outofstock_from_available' ), 999, 3 );
+// A variable parent is an availability aggregate. It is never a second
+// stock source, whether units are enabled or not.
+add_filter( 'woocommerce_product_is_in_stock', array( $this, 'filter_parent_in_stock' ), 999, 2 );
+add_filter( 'woocommerce_is_purchasable', array( $this, 'filter_parent_purchasable' ), 999, 2 );
+}
+
+private function normalize( $value ) {
+if ( ! is_string( $value ) ) return '';
+$value = trim( $value );
+$value = str_replace( array( ' ', "\xC2\xA0", "\xE2\x80\x8C" ), '', $value );
+return function_exists( 'mb_strtolower' ) ? mb_strtolower( $value, 'UTF-8' ) : strtolower( $value );
 }
 
 /**
@@ -90,6 +115,14 @@ return ( '' !== $base_stock && null !== $base_stock );
 /* سینک خودکار                                                          */
 /* ------------------------------------------------------------------ */
 
+public function sync_on_accounting_meta( $meta_id, $object_id, $meta_key, $meta_value ) {
+if ( ! in_array( $meta_key, array( 'WebPrd', '_np-api-sync-date' ), true ) || ! function_exists( 'wc_get_product' ) ) return;
+$product = wc_get_product( absint( $object_id ) );
+if ( ! $product ) return;
+if ( $product->is_type( 'variation' ) ) $product = wc_get_product( $product->get_parent_id() );
+if ( $product ) $this->sync_product_units( $product->get_id() );
+}
+
 public function maybe_sync_on_admin() {
 global $pagenow;
 if ( ! is_admin() ) return;
@@ -102,162 +135,127 @@ if ( ! $post_id || 'product' !== get_post_type( $post_id ) ) return;
 $this->sync_product_units( $post_id );
 }
 
-public function maybe_sync_on_front() {
-global $product;
-if ( ! ( $product instanceof WC_Product ) ) return;
-
-$product_id = $product->is_type( 'variation' ) ? $product->get_parent_id() : $product->get_id();
-$this->sync_product_units( $product_id );
-}
-
 public function sync_product_units( $product_id ) {
 $product_id = absint( $product_id );
-if ( ! $product_id ) return;
+if ( ! $product_id ) return false;
 
 $product = wc_get_product( $product_id );
-if ( ! $product || ! $product->is_type( 'variable' ) ) return;
+if ( ! $product || ! $product->is_type( 'variable' ) ) return false;
 
-$webprd_raw = get_post_meta( $product_id, 'WebPrd', true );
-$info       = $this->extract_unit_info( $webprd_raw );
-if ( ! $info ) return;
-
-$sync_hash = md5( (string) $webprd_raw );
-if ( get_post_meta( $product_id, self::META_SYNC_MARKER, true ) === $sync_hash ) {
-return;
+$parser = WebPrd_Parser::from( $product->get_meta( 'WebPrd', true ) );
+if ( ! $parser->is_valid() ) return false;
+$unit_result = Unit_Engine::resolve_product( $product, $parser );
+$mode = $unit_result['mode'];
+$scope_config = Inventory_Scope::configuration();
+$sync_hash = md5( $parser->hash() . '|' . serialize( $scope_config ) );
+if ( get_post_meta( $product_id, '_novin_unit_mode', true ) === $mode && get_post_meta( $product_id, self::META_SYNC_MARKER, true ) === $sync_hash ) {
+return true;
 }
 
-update_post_meta( $product_id, self::META_BASE_STOCK, $info['base_stock'] );
+update_post_meta( $product_id, '_novin_unit_mode', $mode );
+if ( Unit_Engine::MODE_MULTI_UNIT !== $mode ) {
+// Normal Variable Products retain independently-managed child stock. The
+// plugin never creates pack metadata for them and the parent is only an
+// aggregate container, not a second inventory source.
+$this->clear_multi_unit_metadata( $product );
+$this->normalize_variable_parent( $product );
+update_post_meta( $product_id, self::META_SYNC_MARKER, $sync_hash );
+Product_Health_Snapshot::rebuild( $product_id, 'product' );
+return Unit_Engine::MODE_UNRESOLVED !== $mode;
+}
 
-$variation_ids = $product->get_children();
-if ( empty( $variation_ids ) ) return;
+$scope = Inventory_Scope::aggregate( $parser, $scope_config );
+if ( 'known' !== $scope['status'] || null === $scope['total'] ) {
+// Never substitute Mojodi for a warehouse total. An unresolved scope is
+// explicit and leaves normal variation stock untouched.
+update_post_meta( $product_id, '_novin_unit_mode', Unit_Engine::MODE_UNRESOLVED );
+$this->clear_multi_unit_metadata( $product );
+$this->normalize_variable_parent( $product );
+Product_Health_Snapshot::rebuild( $product_id, 'product' );
+return false;
+}
 
-$base_unit_name = $this->normalize( $info['base_unit_name'] );
-$v2_qty         = $info['v2_qty'];
-
-foreach ( $variation_ids as $vid ) {
-$vid       = absint( $vid );
+$base_stock = max( 0, (float) $scope['total'] );
+update_post_meta( $product_id, self::META_BASE_STOCK, wc_format_decimal( $base_stock ) );
+$mapped_ids = array();
+foreach ( $unit_result['units'] as $unit ) {
+$vid = absint( $unit['variation_id'] );
 $variation = wc_get_product( $vid );
 if ( ! $variation ) continue;
-
-$attrs = $variation->get_attributes();
-$is_base_unit = false;
-
-foreach ( $attrs as $attr_key => $attr_value ) {
-$term_name = $this->get_readable_attribute_value( $attr_key, $attr_value );
-$normalized_value = $this->normalize( $term_name );
-
-if ( $normalized_value === $base_unit_name ) {
-$is_base_unit = true;
-break;
+$mapped_ids[] = $vid;
+update_post_meta( $vid, self::META_UNITS_PER_PACK, wc_format_decimal( $unit['units_per_pack'] ) );
+update_post_meta( $vid, self::META_IS_BASE_UNIT, 'base' === $unit['unit_key'] ? 1 : 0 );
+$this->apply_stock_to_variation( $variation, $base_stock, (float) $unit['units_per_pack'] );
+Product_Health_Snapshot::rebuild( $vid, 'variation' );
 }
-}
-
-if ( $is_base_unit ) {
-update_post_meta( $vid, self::META_UNITS_PER_PACK, 1 );
-update_post_meta( $vid, self::META_IS_BASE_UNIT, 1 );
-$this->apply_stock_to_variation( $variation, $info['base_stock'], 1 );
-} else {
-$units = $v2_qty > 0 ? $v2_qty : 1;
-update_post_meta( $vid, self::META_UNITS_PER_PACK, $units );
-update_post_meta( $vid, self::META_IS_BASE_UNIT, 0 );
-$this->apply_stock_to_variation( $variation, $info['base_stock'], $units );
+if ( count( $mapped_ids ) !== count( (array) $product->get_children() ) ) {
+update_post_meta( $product_id, '_novin_unit_mode', Unit_Engine::MODE_UNRESOLVED );
+$this->clear_multi_unit_metadata( $product );
+$this->normalize_variable_parent( $product );
+Product_Health_Snapshot::rebuild( $product_id, 'product' );
+return false;
 }
 
-wc_delete_product_transients( $vid );
-}
-
+$this->normalize_variable_parent( $product );
 update_post_meta( $product_id, self::META_SYNC_MARKER, $sync_hash );
 wc_delete_product_transients( $product_id );
+Product_Health_Snapshot::rebuild( $product_id, 'product' );
+return true;
+}
+
+private function clear_multi_unit_metadata( $product ) {
+if ( ! ( $product instanceof WC_Product ) ) return;
+delete_post_meta( $product->get_id(), self::META_BASE_STOCK );
+delete_post_meta( $product->get_id(), self::META_SYNC_MARKER );
+foreach ( (array) $product->get_children() as $vid ) {
+delete_post_meta( absint( $vid ), self::META_UNITS_PER_PACK );
+delete_post_meta( absint( $vid ), self::META_IS_BASE_UNIT );
+wc_delete_product_transients( absint( $vid ) );
+}
+}
+
+private function normalize_variable_parent( $product ) {
+if ( ! ( $product instanceof WC_Product ) || ! $product->is_type( 'variable' ) ) return;
+$available = $this->has_available_child( $product );
+$changed = false;
+if ( $product->get_manage_stock() ) { $product->set_manage_stock( false ); $changed = true; }
+if ( null !== $product->get_stock_quantity() ) { $product->set_stock_quantity( null ); $changed = true; }
+$status = $available ? 'instock' : 'outofstock';
+if ( $product->get_stock_status() !== $status ) { $product->set_stock_status( $status ); $changed = true; }
+if ( $changed ) $product->save();
+}
+
+private function has_available_child( $product ) {
+if ( ! ( $product instanceof WC_Product ) || ! $product->is_type( 'variable' ) ) return false;
+foreach ( (array) $product->get_children() as $vid ) {
+$variation = wc_get_product( absint( $vid ) );
+if ( ! $variation || 'publish' !== $variation->get_status() ) continue;
+if ( $variation->is_in_stock() && $variation->is_purchasable() ) return true;
+}
+return false;
+}
+
+public function filter_parent_in_stock( $in_stock, $product ) {
+if ( ! ( $product instanceof WC_Product ) || ! $product->is_type( 'variable' ) ) return $in_stock;
+return $this->has_available_child( $product );
+}
+
+public function filter_parent_purchasable( $purchasable, $product ) {
+if ( ! ( $product instanceof WC_Product ) || ! $product->is_type( 'variable' ) ) return $purchasable;
+return $this->has_available_child( $product );
 }
 
 private function apply_stock_to_variation( $variation, $base_stock, $units_per_pack ) {
 if ( ! ( $variation instanceof WC_Product ) ) return;
-if ( $units_per_pack < 1 ) $units_per_pack = 1;
-
-$stock = (int) floor( $base_stock / $units_per_pack );
-if ( $stock < 0 ) $stock = 0;
-
+$calculated = Unit_Engine::calculate( $base_stock, $units_per_pack );
+if ( ! $calculated ) return;
+$stock = (int) $calculated['stock'];
 $new_status = $stock > 0 ? 'instock' : 'outofstock';
 $changed = false;
-
-if ( ! $variation->get_manage_stock() ) {
-$variation->set_manage_stock( true );
-$changed = true;
-}
-if ( (int) $variation->get_stock_quantity() !== $stock ) {
-$variation->set_stock_quantity( $stock );
-$changed = true;
-}
-if ( $variation->get_stock_status() !== $new_status ) {
-$variation->set_stock_status( $new_status );
-$changed = true;
-}
-
-if ( $changed ) {
-$variation->save();
-}
-}
-
-private function extract_unit_info( $webprd_raw ) {
-if ( empty( $webprd_raw ) || ! is_string( $webprd_raw ) ) return null;
-if ( strlen( $webprd_raw ) > 500000 ) return null;
-
-$data = json_decode( $webprd_raw, true, 10 );
-if ( JSON_ERROR_NONE !== json_last_error() ) return null;
-if ( ! is_array( $data ) ) return null;
-
-$base_unit_name = isset( $data['VahedName'] ) && is_string( $data['VahedName'] ) ? trim( $data['VahedName'] ) : '';
-$v2_qty         = isset( $data['V2Qt'] ) && is_numeric( $data['V2Qt'] ) ? (int) $data['V2Qt'] : 0;
-
-if ( '' === $base_unit_name ) return null;
-
-$base_stock = 0;
-if ( ! empty( $data['PrdAnbarRelation'] ) && is_array( $data['PrdAnbarRelation'] ) ) {
-foreach ( $data['PrdAnbarRelation'] as $anbar ) {
-if ( is_array( $anbar ) && isset( $anbar['Amount'] ) && is_numeric( $anbar['Amount'] ) ) {
-$base_stock += (float) $anbar['Amount'];
-}
-}
-}
-$base_stock = (int) floor( $base_stock );
-if ( $base_stock < 0 ) $base_stock = 0;
-
-return array(
-'base_unit_name' => $base_unit_name,
-'v2_qty'         => $v2_qty,
-'base_stock'     => $base_stock,
-);
-}
-
-private function get_readable_attribute_value( $attr_key, $attr_value ) {
-if ( ! is_string( $attr_value ) || '' === $attr_value ) return '';
-
-$decoded = urldecode( $attr_value );
-
-if ( taxonomy_exists( $attr_key ) ) {
-$term = get_term_by( 'slug', $decoded, $attr_key );
-if ( $term && ! is_wp_error( $term ) ) {
-return $term->name;
-}
-$term = get_term_by( 'slug', $attr_value, $attr_key );
-if ( $term && ! is_wp_error( $term ) ) {
-return $term->name;
-}
-$term = get_term_by( 'name', $decoded, $attr_key );
-if ( $term && ! is_wp_error( $term ) ) {
-return $term->name;
-}
-}
-
-return $decoded;
-}
-
-private function normalize( $str ) {
-if ( ! is_string( $str ) ) return '';
-$str = trim( $str );
-$str = str_replace( array( ' ', "\xC2\xA0", "\xE2\x80\x8C" ), '', $str );
-$str = mb_strtolower( $str, 'UTF-8' );
-return $str;
+if ( ! $variation->get_manage_stock() ) { $variation->set_manage_stock( true ); $changed = true; }
+if ( (int) $variation->get_stock_quantity() !== $stock ) { $variation->set_stock_quantity( $stock ); $changed = true; }
+if ( $variation->get_stock_status() !== $new_status ) { $variation->set_stock_status( $new_status ); $changed = true; }
+if ( $changed ) $variation->save();
 }
 
 /* ------------------------------------------------------------------ */
@@ -422,69 +420,189 @@ return $passed;
 /* ------------------------------------------------------------------ */
 
 public function reduce_base_stock_on_order( $order ) {
-if ( ! ( $order instanceof WC_Order ) ) return;
+if ( ! ( $order instanceof WC_Order ) ) return false;
 
-$affected_parents = array();
+// The order meta is useful for diagnostics, but it is not the concurrency
+// primitive: two requests can read it before either save() completes. The
+// stock-operation table is claimed in the same transaction as the decrement.
+if ( $order->get_meta( self::ORDER_REDUCED_META, true ) ) return true;
 
-foreach ( $order->get_items() as $item ) {
-if ( ! ( $item instanceof WC_Order_Item_Product ) ) continue;
+$changes = $this->collect_order_stock_changes( $order );
+if ( empty( $changes ) ) return true;
 
-$variation_id = $item->get_variation_id();
-if ( ! $variation_id ) continue;
-if ( ! $this->is_managed_variation( $variation_id ) ) continue;
-
-$product_id = $item->get_product_id();
-$qty        = (int) $item->get_quantity();
-if ( $qty <= 0 || ! $product_id ) continue;
-
-$units_per_pack = (int) get_post_meta( $variation_id, self::META_UNITS_PER_PACK, true );
-if ( $units_per_pack < 1 ) $units_per_pack = 1;
-
-$base_reduction = $qty * $units_per_pack;
-
-$current_base = (int) get_post_meta( $product_id, self::META_BASE_STOCK, true );
-$new_base     = $current_base - $base_reduction;
-if ( $new_base < 0 ) $new_base = 0;
-
-update_post_meta( $product_id, self::META_BASE_STOCK, $new_base );
-$affected_parents[ $product_id ] = true;
+if ( ! $this->apply_base_stock_changes_atomically( $changes, false, 'reduce_order:' . $order->get_id(), $order->get_id() ) ) {
+$this->log_stock_failure( $order->get_id(), 'کاهش اتمیک موجودی پایه انجام نشد؛ موجودی کافی یا متای معتبر یافت نشد.' );
+return false;
 }
 
-foreach ( array_keys( $affected_parents ) as $pid ) {
-$this->rebalance_variations( $pid );
-}
+$order->update_meta_data( self::ORDER_REDUCED_META, gmdate( 'c' ) );
+$order->save();
+$this->rebalance_parents( array_keys( $changes ) );
+return true;
 }
 
 public function restore_base_stock_on_order( $order ) {
-if ( ! ( $order instanceof WC_Order ) ) return;
-
-$affected_parents = array();
-
-foreach ( $order->get_items() as $item ) {
-if ( ! ( $item instanceof WC_Order_Item_Product ) ) continue;
-
-$variation_id = $item->get_variation_id();
-if ( ! $variation_id ) continue;
-if ( ! $this->is_managed_variation( $variation_id ) ) continue;
-
-$product_id = $item->get_product_id();
-$qty        = (int) $item->get_quantity();
-if ( $qty <= 0 || ! $product_id ) continue;
-
-$units_per_pack = (int) get_post_meta( $variation_id, self::META_UNITS_PER_PACK, true );
-if ( $units_per_pack < 1 ) $units_per_pack = 1;
-
-$base_addition = $qty * $units_per_pack;
-
-$current_base = (int) get_post_meta( $product_id, self::META_BASE_STOCK, true );
-$new_base     = $current_base + $base_addition;
-
-update_post_meta( $product_id, self::META_BASE_STOCK, $new_base );
-$affected_parents[ $product_id ] = true;
+if ( ! ( $order instanceof WC_Order ) ) return false;
+if ( ! $order->get_meta( self::ORDER_REDUCED_META, true ) || $order->get_meta( self::ORDER_RESTORED_META, true ) ) {
+return true;
 }
 
-foreach ( array_keys( $affected_parents ) as $pid ) {
-$this->rebalance_variations( $pid );
+$changes = $this->collect_order_stock_changes( $order );
+if ( empty( $changes ) ) return true;
+if ( ! $this->apply_base_stock_changes_atomically( $changes, true, 'restore_order:' . $order->get_id(), $order->get_id() ) ) {
+$this->log_stock_failure( $order->get_id(), 'بازگردانی اتمیک موجودی پایه انجام نشد.' );
+return false;
+}
+
+$order->update_meta_data( self::ORDER_RESTORED_META, gmdate( 'c' ) );
+$order->save();
+$this->rebalance_parents( array_keys( $changes ) );
+return true;
+}
+
+/**
+ * Restore only the quantities represented by a WooCommerce refund. The
+ * refund id is the idempotency key, so repeated full/partial refund hooks do
+ * not duplicate stock.
+ */
+public function restore_base_stock_on_refund( $order_id, $refund_id ) {
+$order  = function_exists( 'wc_get_order' ) ? wc_get_order( absint( $order_id ) ) : false;
+$refund = function_exists( 'wc_get_order' ) ? wc_get_order( absint( $refund_id ) ) : false;
+if ( ! ( $order instanceof WC_Order ) || ! ( $refund instanceof WC_Order ) ) return false;
+if ( ! $order->get_meta( self::ORDER_REDUCED_META, true ) || $order->get_meta( self::ORDER_RESTORED_META, true ) ) return true;
+if ( $refund->get_meta( self::REFUND_RESTORED_META, true ) ) return true;
+
+$changes = $this->collect_order_stock_changes( $refund, true );
+if ( empty( $changes ) ) return true;
+if ( ! $this->apply_base_stock_changes_atomically( $changes, true, 'refund:' . $refund->get_id(), $refund->get_id() ) ) {
+$this->log_stock_failure( absint( $order_id ), 'بازگردانی موجودی برای refund انجام نشد.' );
+return false;
+}
+
+$refund->update_meta_data( self::REFUND_RESTORED_META, gmdate( 'c' ) );
+$refund->save();
+$this->rebalance_parents( array_keys( $changes ) );
+return true;
+}
+
+/**
+ * @param WC_Order $order
+ * @param bool     $refund Quantities in refund line items are negative.
+ * @return array<int,int> Parent product id => base-unit delta.
+ */
+private function collect_order_stock_changes( $order, $refund = false ) {
+$changes = array();
+foreach ( $order->get_items() as $item ) {
+if ( ! ( $item instanceof WC_Order_Item_Product ) ) continue;
+$variation_id = absint( $item->get_variation_id() );
+if ( ! $variation_id || ! $this->is_managed_variation( $variation_id ) ) continue;
+$product_id = absint( $item->get_product_id() );
+$quantity   = absint( abs( (int) $item->get_quantity() ) );
+if ( ! $product_id || ! $quantity ) continue;
+$units = max( 1, (int) get_post_meta( $variation_id, self::META_UNITS_PER_PACK, true ) );
+$delta = $quantity * $units;
+$changes[ $product_id ] = (int) ( $changes[ $product_id ] ?? 0 ) + $delta;
+}
+return $changes;
+}
+
+/**
+ * Apply all parent deltas in one InnoDB transaction. A decrement updates only
+ * when the current value is at least the requested amount; overselling is an
+ * explicit failure, never silently clamped with max(0, ...). The operation
+ * identity is inserted in the same transaction, so a duplicate WooCommerce
+ * lifecycle hook cannot apply the delta twice even when order meta saves race.
+ */
+private function apply_base_stock_changes_atomically( array $changes, $addition, $operation_key, $entity_id ) {
+global $wpdb;
+$meta_table = $wpdb->postmeta;
+$ops_table  = $wpdb->prefix . self::OPERATION_TABLE_SUFFIX;
+if ( empty( $changes ) || '' === (string) $operation_key ) return true;
+
+$operation_key = preg_replace( '/[^a-zA-Z0-9:_-]/', '', (string) $operation_key );
+$operation_key = substr( $operation_key, 0, 100 );
+if ( '' === $operation_key ) return false;
+
+$table_exists = $wpdb->get_var( $wpdb->prepare( 'SHOW TABLES LIKE %s', $wpdb->esc_like( $ops_table ) ) );
+if ( $ops_table !== $table_exists ) {
+// Without the verified idempotency table, fail closed rather than falling
+// back to a non-atomic order-meta check.
+return false;
+}
+if ( false === $wpdb->query( 'START TRANSACTION' ) ) {
+return false;
+}
+
+$claimed = $wpdb->query(
+$wpdb->prepare(
+"INSERT IGNORE INTO {$ops_table} (operation_key, entity_id, operation_type, created_at) VALUES (%s, %d, %s, %s)",
+$operation_key,
+absint( $entity_id ),
+$addition ? 'restore' : 'reduce',
+current_time( 'mysql', true )
+)
+);
+if ( false === $claimed ) {
+$wpdb->query( 'ROLLBACK' );
+return false;
+}
+if ( 0 === (int) $claimed ) {
+// The previous request committed this exact operation. There is no stock
+// work left to do, but the caller may repair its CRUD marker.
+if ( false === $wpdb->query( 'COMMIT' ) ) {
+$wpdb->query( 'ROLLBACK' );
+return false;
+}
+return true;
+}
+
+foreach ( $changes as $product_id => $delta ) {
+$product_id = absint( $product_id );
+$delta      = absint( $delta );
+if ( ! $product_id || ! $delta ) continue;
+
+$meta_id = $wpdb->get_var( $wpdb->prepare(
+"SELECT meta_id FROM {$meta_table} WHERE post_id = %d AND meta_key = %s ORDER BY meta_id ASC LIMIT 1",
+$product_id,
+self::META_BASE_STOCK
+) );
+if ( ! $meta_id ) {
+$wpdb->query( 'ROLLBACK' );
+return false;
+}
+
+if ( $addition ) {
+$sql = "UPDATE {$meta_table} SET meta_value = CAST(meta_value AS UNSIGNED) + %d WHERE meta_id = %d";
+$result = $wpdb->query( $wpdb->prepare( $sql, $delta, absint( $meta_id ) ) );
+} else {
+$sql = "UPDATE {$meta_table} SET meta_value = CAST(meta_value AS UNSIGNED) - %d WHERE meta_id = %d AND CAST(meta_value AS UNSIGNED) >= %d";
+$result = $wpdb->query( $wpdb->prepare( $sql, $delta, absint( $meta_id ), $delta ) );
+}
+if ( 1 !== (int) $result ) {
+$wpdb->query( 'ROLLBACK' );
+return false;
+}
+}
+
+if ( false === $wpdb->query( 'COMMIT' ) ) {
+$wpdb->query( 'ROLLBACK' );
+return false;
+}
+foreach ( array_keys( $changes ) as $product_id ) {
+clean_post_cache( absint( $product_id ) );
+}
+return true;
+}
+
+private function rebalance_parents( array $product_ids ) {
+foreach ( $product_ids as $product_id ) {
+$this->rebalance_variations( absint( $product_id ) );
+}
+}
+
+private function log_stock_failure( $order_id, $message ) {
+if ( class_exists( '\MobinDev\Novin_Commerce\Common\SyncLog' ) ) {
+\MobinDev\Novin_Commerce\Common\SyncLog::add( 'stock', 'error', 'order', absint( $order_id ), $message );
 }
 }
 
@@ -507,9 +625,11 @@ $units = (int) get_post_meta( $vid, self::META_UNITS_PER_PACK, true );
 if ( $units < 1 ) $units = 1;
 
 $this->apply_stock_to_variation( $variation, $base_stock, $units );
+Product_Health_Snapshot::rebuild( $vid, 'variation' );
 wc_delete_product_transients( $vid );
 }
 
 wc_delete_product_transients( $product_id );
+Product_Health_Snapshot::rebuild( $product_id, 'product' );
 }
 }

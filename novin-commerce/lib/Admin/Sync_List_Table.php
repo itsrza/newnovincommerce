@@ -75,13 +75,38 @@ class Sync_List_Table extends \WP_List_Table {
         return '';
     }
 
-    public function fetchTableData() {
-        $rows = Sync::orderBy( 'priority', 'desc' )
-            ->orderBy( 'id', 'asc' )
-            ->get()
-            ->toArray();
-
-        return is_array( $rows ) ? $rows : [];
+    /**
+     * Read only one bounded page. The queue can grow without making the
+     * admin request allocate the complete table in PHP.
+     *
+     * @param int    $limit   Page size.
+     * @param int    $offset  Page offset.
+     * @param string $orderby Requested logical column.
+     * @param string $order   ASC or DESC.
+     * @return array
+     */
+    public function fetchTableData( $limit = 20, $offset = 0, $orderby = 'priority', $order = 'DESC' ) {
+        global $wpdb;
+        $table = $wpdb->prefix . 'novin_commerce_syncs';
+        $map   = array(
+            'sync_id'    => 'id',
+            'item_id'    => 'item_id',
+            'item_type'  => 'item_type',
+            'priority'   => 'priority',
+            'created_at' => 'created_at',
+        );
+        $sort  = $map[ $orderby ] ?? 'priority';
+        $order = 'ASC' === strtoupper( $order ) ? 'ASC' : 'DESC';
+        $limit = min( 100, max( 1, absint( $limit ) ) );
+        $offset = max( 0, absint( $offset ) );
+        return (array) $wpdb->get_results(
+            $wpdb->prepare(
+                "SELECT id, item_id, item_type, priority, created_at FROM {$table} ORDER BY {$sort} {$order}, id ASC LIMIT %d OFFSET %d", // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared -- sort is allowlisted and table is plugin-owned.
+                $limit,
+                $offset
+            ),
+            ARRAY_A
+        );
     }
 
     private function handleRowDelete() {
@@ -128,32 +153,20 @@ class Sync_List_Table extends \WP_List_Table {
         $sortable = $this->get_sortable_columns();
         $this->_column_headers = [ $columns, $hidden, $sortable ];
 
-        $data = $this->fetchTableData();
+        global $wpdb;
+        $table        = $wpdb->prefix . 'novin_commerce_syncs';
+        $orderby      = isset( $_REQUEST['orderby'] ) ? sanitize_key( wp_unslash( $_REQUEST['orderby'] ) ) : 'priority';
+        $order        = isset( $_REQUEST['order'] ) ? sanitize_key( wp_unslash( $_REQUEST['order'] ) ) : 'desc';
+        $per_page     = min( 100, max( 1, (int) $this->get_items_per_page( 'novin_sync_per_page', 20 ) ) );
+        $current_page = max( 1, (int) $this->get_pagenum() );
+        $offset       = ( $current_page - 1 ) * $per_page;
+        $total_items  = (int) $wpdb->get_var( "SELECT COUNT(*) FROM {$table}" ); // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared -- table is plugin-owned.
 
-        $orderby = isset( $_REQUEST['orderby'] ) ? sanitize_key( wp_unslash( $_REQUEST['orderby'] ) ) : 'priority';
-        $order   = isset( $_REQUEST['order'] ) ? sanitize_key( wp_unslash( $_REQUEST['order'] ) ) : 'desc';
-
-        usort( $data, function ( $a, $b ) use ( $orderby, $order ) {
-            $key  = in_array( $orderby, [ 'sync_id', 'item_id', 'item_type', 'priority', 'created_at' ], true ) ? ( 'sync_id' === $orderby ? 'id' : $orderby ) : 'id';
-            $valA = $a[ $key ] ?? '';
-            $valB = $b[ $key ] ?? '';
-            if ( is_numeric( $valA ) && is_numeric( $valB ) ) {
-                $cmp = $valA <=> $valB;
-            } else {
-                $cmp = strcmp( (string) $valA, (string) $valB );
-            }
-            return 'asc' === $order ? $cmp : -$cmp;
-        } );
-
-        $per_page     = $this->get_items_per_page( 'novin_sync_per_page', 20 );
-        $current_page = $this->get_pagenum();
-        $total_items  = count( $data );
-
-        $this->items = array_slice( $data, ( $current_page - 1 ) * $per_page, $per_page );
+        $this->items = $this->fetchTableData( $per_page, $offset, $orderby, $order );
         $this->set_pagination_args( [
             'total_items' => $total_items,
             'per_page'    => $per_page,
-            'total_pages' => ceil( $total_items / $per_page ),
+            'total_pages' => $total_items > 0 ? (int) ceil( $total_items / $per_page ) : 0,
         ] );
     }
 }

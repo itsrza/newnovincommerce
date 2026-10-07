@@ -138,6 +138,13 @@ $this->has_role_price_cache[ $cache_key ] = $result;
 return $result;
 }
 
+private function convert_role_price( $price ) {
+	// Currency_Conversion is the single WooCommerce price boundary. Keep
+	// role values in accounting/Rial units here; its final getter filter
+	// converts them exactly once for display, cart and checkout.
+	return $price;
+}
+
 private function get_effective_price_for_post( $post_id, $role ) {
 $cache_key = absint( $post_id ) . ':' . $role;
 if ( array_key_exists( $cache_key, $this->effective_price_cache ) ) {
@@ -150,11 +157,11 @@ $this->effective_price_cache[ $cache_key ] = null;
 return null;
 }
 
-$regular = wc_format_decimal( $regular_raw );
+$regular = $this->convert_role_price( wc_format_decimal( $regular_raw ) );
 $sale_raw = $this->get_role_sale_raw( $post_id, $role );
 
 if ( $this->is_valid_price( $sale_raw ) ) {
-$sale = wc_format_decimal( $sale_raw );
+$sale = $this->convert_role_price( wc_format_decimal( $sale_raw ) );
 if ( (float) $sale < (float) $regular ) {
 $this->effective_price_cache[ $cache_key ] = $sale;
 return $sale;
@@ -208,7 +215,7 @@ if ( ! $this->is_valid_price( $regular_raw ) ) {
 if ( class_exists( 'NovinCommerce_RolePrice_Settings' ) && NovinCommerce_RolePrice_Settings::is_contact_us_enabled() ) return '';
 return $price;
 }
-return wc_format_decimal( $regular_raw );
+return $this->convert_role_price( wc_format_decimal( $regular_raw ) );
 }
 
 public function filter_sale_price( $price, $product ) {
@@ -230,7 +237,7 @@ $sale_raw = $this->get_role_sale_raw( $product_id, $role );
 if ( ! $this->is_valid_price( $sale_raw ) ) {
 return $price;
 }
-return wc_format_decimal( $sale_raw );
+return $this->convert_role_price( wc_format_decimal( $sale_raw ) );
 }
 
 public function filter_is_on_sale( $on_sale, $product ) {

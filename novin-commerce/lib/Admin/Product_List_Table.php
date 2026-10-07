@@ -2,6 +2,8 @@
 
 namespace Novinwp\Novin_Commerce\Admin;
 
+use MobinDev\Novin_Commerce\Common\Accounting\WebPrd\WebPrd_Parser;
+
 /**
  * Optimized WooCommerce product/variation list for Novin Commerce.
  *
@@ -101,7 +103,7 @@ class Product_List_Table extends List_Table {
 	public function fetchTableData() {
 		global $wpdb;
 
-		$per_page     = max( 1, (int) $this->get_items_per_page( 'per_page', 20 ) );
+		$per_page     = min( 100, max( 1, (int) $this->get_items_per_page( 'per_page', 20 ) ) );
 		$current_page = max( 1, (int) $this->get_pagenum() );
 		$offset       = ( $current_page - 1 ) * $per_page;
 		$search       = isset( $_REQUEST['s'] ) ? sanitize_text_field( wp_unslash( $_REQUEST['s'] ) ) : '';
@@ -166,7 +168,7 @@ class Product_List_Table extends List_Table {
 		if ( 'stock_quantity' === $orderby ) {
 			$join[] = "LEFT JOIN {$wpdb->postmeta} stock ON stock.post_id = p.ID AND stock.meta_key = '_stock'";
 		}
-		if ( 'guid' === $orderby ) {
+		if ( in_array( $orderby, [ 'guid', 'accounting' ], true ) ) {
 			$join[] = "LEFT JOIN {$wpdb->postmeta} guid ON guid.post_id = p.ID AND guid.meta_key = 'guid'";
 		}
 		if ( 'sync_date' === $orderby ) {
@@ -243,21 +245,11 @@ class Product_List_Table extends List_Table {
 	public function getGUID( $item ) {
 		$guid = trim( (string) $item->get_meta( 'guid', true ) );
 		if ( '' !== $guid ) return $guid;
-		$webprd = $item->get_meta( 'WebPrd', true );
-		if ( is_string( $webprd ) && '' !== $webprd ) {
-			$data = json_decode( $webprd, true );
-			if ( is_array( $data ) && ! empty( $data['Guid'] ) ) return trim( (string) $data['Guid'] );
-		}
-		return '';
+		return trim( (string) WebPrd_Parser::from( $item->get_meta( 'WebPrd', true ) )->identity()['guid'] );
 	}
 
 	public function getSourceGUID( $item ) {
-		$webprd = $item->get_meta( 'WebPrd', true );
-		if ( is_string( $webprd ) && '' !== $webprd ) {
-			$data = json_decode( $webprd, true );
-			if ( is_array( $data ) && ! empty( $data['Guid'] ) ) return trim( (string) $data['Guid'] );
-		}
-		return '';
+		return trim( (string) WebPrd_Parser::from( $item->get_meta( 'WebPrd', true ) )->identity()['guid'] );
 	}
 
 	public function getSyncDate( $item ) {
@@ -311,12 +303,12 @@ class Product_List_Table extends List_Table {
 			$rows[] = '<code class="copyable" data-copy="' . esc_attr( $guid ) . '" title="برای کپی کلیک کنید">' . esc_html( $guid ) . '</code>';
 		}
 
-		if ( '' !== (string) $meta ) {
-			$decoded = is_string( $meta ) ? json_decode( $meta, true ) : [];
-			$acc_name = ( is_array( $decoded ) && isset( $decoded['Name'] ) ) ? trim( (string) $decoded['Name'] ) : trim( (string) $meta );
-			$color = mb_strtolower( $acc_name ) !== mb_strtolower( $product_name ) ? 'novin-acc-mismatch' : 'novin-acc-match';
-			$rows[] = '<span class="' . $color . '">' . esc_html( $acc_name ) . '</span>';
-		}
+			if ( '' !== (string) $meta ) {
+				$acc_name = trim( (string) WebPrd_Parser::from( $meta )->catalog()['name'] );
+				if ( '' === $acc_name ) $acc_name = trim( (string) $meta );
+				$color = mb_strtolower( $acc_name ) !== mb_strtolower( $product_name ) ? 'novin-acc-mismatch' : 'novin-acc-match';
+				$rows[] = '<span class="' . $color . '">' . esc_html( $acc_name ) . '</span>';
+			}
 
 		$output = implode( '<br>', $rows );
 

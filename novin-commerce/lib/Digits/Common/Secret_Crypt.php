@@ -1,40 +1,45 @@
 <?php
 
-namespace Novinwp\Novin_Commerce\Digits\Common;
+namespace MobinDev\Novin_Commerce\Digits\Common;
 
 /**
- * Small helper for encrypting/decrypting sensitive settings values
- * (currently: SMS gateway and accounting-connection passwords) before they
- * are stored in the database, instead of keeping them as plain text inside
- * a WordPress option like every other setting.
+ * Encrypt values that must be recoverable by the site (for example an SMS
+ * provider credential).
  *
- * This intentionally does NOT introduce a new secret to manage: it
- * derives its key from WordPress's own AUTH_KEY/AUTH_SALT constants
- * (already present in every install's wp-config.php), the same trust
- * boundary WordPress itself relies on for cookie/session secrets.
+ * The encryption key is deliberately not derived from a database option. It
+ * must be supplied by wp-config.php or the process environment as
+ * NOVIN_COMMERCE_ENCRYPTION_KEY. A missing key is a configuration error:
+ * this class never silently falls back to plaintext or to a predictable site
+ * value.
  *
- * This is meant to stop a password from sitting in the database in
- * plain text (e.g. visible in a raw DB dump or backup) — it is not a
- * substitute for restricting DB/admin access.
+ * New values use authenticated AES-256-GCM. The legacy CBC format and legacy
+ * unmarked plaintext are readable only to support a one-time migration; they
+ * are never produced by encrypt(). Callers must save a migrated value before
+ * considering the migration complete.
  */
 class Secret_Crypt {
 
-	const PREFIX = 'novin-aes-v1:';
+	const PREFIX        = 'novin-gcm-v1:';
+	const LEGACY_PREFIX = 'novin-aes-v1:';
+	const KEY_CONSTANT  = 'NOVIN_COMMERCE_ENCRYPTION_KEY';
+	const NONCE_LENGTH  = 12;
+	const TAG_LENGTH    = 16;
 
-	private static function get_key() {
-		$key_material = ( defined( 'AUTH_KEY' ) ? AUTH_KEY : '' ) . ( defined( 'AUTH_SALT' ) ? AUTH_SALT : '' );
-		if ( '' === $key_material ) {
-			// Extremely unlikely on a real WordPress install, but keep a
-			// stable per-site fallback so encryption never hard-fails.
-			$key_material = get_site_url() . DB_NAME;
-		}
-
-		return hash( 'sha256', $key_material, true );
+	/**
+	 * Whether authenticated encryption can be performed on this site.
+	 *
+	 * @return bool
+	 */
+	public static function has_key() {
+		return '' !== self::key_material();
 	}
 
 	/**
-	 * @param string $plain
-	 * @return string Marked Base64-encoded ciphertext, or '' if input was empty.
+	 * Encrypt a value with AES-256-GCM.
+	 *
+	 * @param string $plain Plaintext.
+	 * @return string|false Marked ciphertext, or false when encryption is not
+	 *                     possible. False is intentional fail-closed behavior.
 	 */
 	public static function encrypt( $plain ) {
 		$plain = (string) $plain;
@@ -42,53 +47,166 @@ class Secret_Crypt {
 			return '';
 		}
 
-		if ( ! function_exists( 'openssl_encrypt' ) ) {
-				// Some hosts do not provide OpenSSL; retain the value rather than
-				// silently losing a connection credential.
-			return $plain;
+		$key = self::key();
+		if ( false === $key || ! function_exists( 'openssl_encrypt' ) || ! function_exists( 'random_bytes' ) ) {
+			return false;
 		}
 
-		$iv        = openssl_random_pseudo_bytes( 16 );
-		$encrypted = openssl_encrypt( $plain, 'aes-256-cbc', self::get_key(), OPENSSL_RAW_DATA, $iv );
-		if ( false === $encrypted ) {
-			return $plain;
+		try {
+			$nonce = random_bytes( self::NONCE_LENGTH );
+		} catch ( \Throwable $exception ) {
+			return false;
 		}
 
-		return self::PREFIX . base64_encode( $iv . $encrypted ); // phpcs:ignore WordPress.PHP.DiscouragedPHPFunctions.obfuscation_base64_encode
+		$tag       = '';
+		$ciphertext = openssl_encrypt(
+			$plain,
+			'aes-256-gcm',
+			$key,
+			OPENSSL_RAW_DATA,
+			$nonce,
+			$tag,
+			'',
+			self::TAG_LENGTH
+		);
+
+		if ( false === $ciphertext || self::TAG_LENGTH !== strlen( (string) $tag ) ) {
+			return false;
+		}
+
+		return self::PREFIX . base64_encode( $nonce . $tag . $ciphertext ); // phpcs:ignore WordPress.PHP.DiscouragedPHPFunctions.obfuscation_base64_encode
 	}
 
 	/**
-	 * @param string $stored
-	 * @return string Decrypted plain text, or '' if input was empty/invalid.
+	 * Decrypt a stored value. Legacy values are returned in memory so the
+	 * administrator can replace them, but callers must not persist them again
+	 * without passing through encrypt().
+	 *
+	 * @param string $stored Stored value.
+	 * @return string Plaintext, or an empty string when the value is invalid or
+	 *                the current key cannot decrypt it.
 	 */
 	public static function decrypt( $stored ) {
 		$stored = (string) $stored;
-		if ( '' === $stored ) {
+		if ( '' === $stored || ! self::has_key() ) {
+			// A deployment without its out-of-database key must not expose
+			// legacy plaintext or attempt legacy decryption. Callers can show
+			// a generic configuration error and preserve the stored value.
 			return '';
 		}
 
-		$has_prefix = 0 === strpos( $stored, self::PREFIX );
-		$payload    = $has_prefix ? substr( $stored, strlen( self::PREFIX ) ) : $stored;
-
-		if ( ! function_exists( 'openssl_decrypt' ) ) {
-			return $has_prefix ? '' : $stored;
+		if ( 0 === strpos( $stored, self::PREFIX ) ) {
+			return self::decrypt_gcm( substr( $stored, strlen( self::PREFIX ) ) );
 		}
 
-		$raw = base64_decode( $payload, true ); // phpcs:ignore WordPress.PHP.DiscouragedPHPFunctions.obfuscation_base64_decode
+		if ( 0 === strpos( $stored, self::LEGACY_PREFIX ) ) {
+			return self::decrypt_legacy_cbc( substr( $stored, strlen( self::LEGACY_PREFIX ) ) );
+		}
+
+		// Values written by the original plugin were plaintext. Keep them
+		// readable only in memory to avoid an unexpected credential outage; the
+		// settings layer reports that they need migration and never writes them
+		// back unchanged.
+		return $stored;
+	}
+
+	/**
+	 * Whether a value is already in the current authenticated format.
+	 *
+	 * @param string $stored Stored value.
+	 * @return bool
+	 */
+	public static function is_current_format( $stored ) {
+		return 0 === strpos( (string) $stored, self::PREFIX );
+	}
+
+	/**
+	 * Whether a stored value needs replacement with the current format.
+	 *
+	 * @param string $stored Stored value.
+	 * @return bool
+	 */
+	public static function needs_migration( $stored ) {
+		$stored = (string) $stored;
+		return '' !== $stored && ! self::is_current_format( $stored );
+	}
+
+	private static function key_material() {
+		if ( defined( self::KEY_CONSTANT ) ) {
+			$value = constant( self::KEY_CONSTANT );
+			if ( is_string( $value ) && '' !== trim( $value ) ) {
+				return trim( $value );
+			}
+		}
+
+		if ( function_exists( 'getenv' ) ) {
+			$value = getenv( self::KEY_CONSTANT );
+			if ( is_string( $value ) && '' !== trim( $value ) ) {
+				return trim( $value );
+			}
+		}
+
+		return '';
+	}
+
+	/**
+	 * @return string|false A binary 32-byte key.
+	 */
+	private static function key() {
+		$material = self::key_material();
+		return '' === $material ? false : hash( 'sha256', $material, true );
+	}
+
+	private static function decrypt_gcm( $payload ) {
+		$key = self::key();
+		if ( false === $key || ! function_exists( 'openssl_decrypt' ) ) {
+			return '';
+		}
+
+		$raw = base64_decode( (string) $payload, true ); // phpcs:ignore WordPress.PHP.DiscouragedPHPFunctions.obfuscation_base64_decode
+		if ( false === $raw || strlen( $raw ) <= self::NONCE_LENGTH + self::TAG_LENGTH ) {
+			return '';
+		}
+
+		$nonce      = substr( $raw, 0, self::NONCE_LENGTH );
+		$tag        = substr( $raw, self::NONCE_LENGTH, self::TAG_LENGTH );
+		$ciphertext = substr( $raw, self::NONCE_LENGTH + self::TAG_LENGTH );
+		$plain = openssl_decrypt(
+			$ciphertext,
+			'aes-256-gcm',
+			$key,
+			OPENSSL_RAW_DATA,
+			$nonce,
+			$tag,
+			'',
+			self::TAG_LENGTH
+		);
+
+		return false === $plain ? '' : (string) $plain;
+	}
+
+	/**
+	 * Read the old AES-CBC format so it can be replaced by AES-GCM. This is
+	 * intentionally not used as a fallback for new encryption.
+	 *
+	 * @param string $payload Base64 payload without the legacy prefix.
+	 * @return string
+	 */
+	private static function decrypt_legacy_cbc( $payload ) {
+		if ( ! defined( 'AUTH_KEY' ) || ! defined( 'AUTH_SALT' ) || ! function_exists( 'openssl_decrypt' ) ) {
+			return '';
+		}
+
+		$raw = base64_decode( (string) $payload, true ); // phpcs:ignore WordPress.PHP.DiscouragedPHPFunctions.obfuscation_base64_decode
 		if ( false === $raw || strlen( $raw ) <= 16 ) {
-			// Values without the marker may be legacy plain-text passwords.
-			// Never turn those into an empty value merely because they happen
-			// to be an invalid Base64 string.
-			return $has_prefix ? '' : $stored;
+			return '';
 		}
 
+		$key       = hash( 'sha256', (string) AUTH_KEY . (string) AUTH_SALT, true );
 		$iv        = substr( $raw, 0, 16 );
-		$cipher    = substr( $raw, 16 );
-		$decrypted = openssl_decrypt( $cipher, 'aes-256-cbc', self::get_key(), OPENSSL_RAW_DATA, $iv );
+		$ciphertext = substr( $raw, 16 );
+		$plain     = openssl_decrypt( $ciphertext, 'aes-256-cbc', $key, OPENSSL_RAW_DATA, $iv );
 
-		// The unmarked format was used by the first implementation. Keep it
-		// readable for existing sites, while new values are explicitly marked
-		// so a legacy plain-text value can never be confused with ciphertext.
-		return false === $decrypted ? ( $has_prefix ? '' : $stored ) : $decrypted;
+		return false === $plain ? '' : (string) $plain;
 	}
 }

@@ -8,6 +8,8 @@ class NovinCommerce_RolePrice_Roles {
 	const OPTION_KEY          = 'wcpbr_roles_config';
 	const FESTI_META_KEY      = 'festiUserRolePrices';
 	const FESTI_SALE_KEY      = 'salePrice';
+	const ORIGIN_META_PREFIX  = '_novin_role_price_origin_';
+	const ORIGINS              = array( 'accounting', 'manual', 'inherited', 'legacy', 'unknown' );
 
 	private static function default_config() {
 		return array(
@@ -30,8 +32,9 @@ class NovinCommerce_RolePrice_Roles {
 		$config = get_option( self::OPTION_KEY, null );
 
 		if ( null === $config || ! is_array( $config ) ) {
+			// Reading prices on a frontend request must be side-effect free.
+			// Activation/admin settings can persist the defaults explicitly.
 			$config = self::default_config();
-			update_option( self::OPTION_KEY, $config );
 		}
 
 		return $config;
@@ -95,8 +98,10 @@ class NovinCommerce_RolePrice_Roles {
 
 		$defined_roles = array_keys( self::get_roles() );
 
-		foreach ( $user->roles as $role ) {
-			if ( in_array( $role, $defined_roles, true ) ) {
+		// Configuration order is the explicit priority. Do not depend on the
+		// order in which another plugin happened to attach roles to the user.
+		foreach ( $defined_roles as $role ) {
+			if ( in_array( $role, $user->roles, true ) ) {
 				return $role;
 			}
 		}
@@ -110,6 +115,19 @@ class NovinCommerce_RolePrice_Roles {
 
 	public static function sale_meta_key( $role ) {
 		return '_wcpbr_sale_price_' . sanitize_key( $role );
+	}
+
+	public static function origin_meta_key( $role ) {
+		return self::ORIGIN_META_PREFIX . sanitize_key( $role );
+	}
+
+	public static function normalize_origin( $origin ) {
+		$origin = sanitize_key( $origin );
+		return in_array( $origin, self::ORIGINS, true ) ? $origin : 'unknown';
+	}
+
+	public static function set_origin( $post_id, $role, $origin ) {
+		update_post_meta( absint( $post_id ), self::origin_meta_key( $role ), self::normalize_origin( $origin ) );
 	}
 
 	/**

@@ -1,6 +1,6 @@
 <?php
 
-namespace Novinwp\Novin_Commerce\Digits\SmsGateways;
+namespace MobinDev\Novin_Commerce\Digits\SmsGateways;
 
 /**
  * Central place that lists every available SMS gateway. Adding a new

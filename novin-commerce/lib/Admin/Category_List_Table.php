@@ -1,6 +1,6 @@
 <?php
 
-namespace Novinwp\Novin_Commerce\Admin;
+namespace MobinDev\Novin_Commerce\Admin;
 
 class Category_List_Table extends List_Table {
 	protected $name = 'category';
@@ -56,17 +56,34 @@ class Category_List_Table extends List_Table {
 	 * @return \WP_Error|\WP_Term[]
 	 */
 	public function fetchTableData() {
-		$search = isset( $_REQUEST['s'] ) ? sanitize_text_field( wp_unslash( trim( (string) $_REQUEST['s'] ) ) ) : '';
-
-		$terms = get_terms(
-			array(
-				'taxonomy'   => 'product_cat',
-				'hide_empty' => false,
-				'search'     => $search,
-			)
+		$search       = isset( $_REQUEST['s'] ) ? sanitize_text_field( wp_unslash( trim( (string) $_REQUEST['s'] ) ) ) : '';
+		$per_page     = min( 100, max( 1, (int) $this->get_items_per_page( 'per_page', 20 ) ) );
+		$current_page = max( 1, (int) $this->get_pagenum() );
+		$orderby      = isset( $_REQUEST['orderby'] ) ? sanitize_key( wp_unslash( $_REQUEST['orderby'] ) ) : 'name';
+		$order        = isset( $_REQUEST['order'] ) && 'desc' === strtolower( (string) wp_unslash( $_REQUEST['order'] ) ) ? 'DESC' : 'ASC';
+		$term_orderby = array( 'id' => 'term_id', 'name' => 'name', 'slug' => 'slug', 'quantity' => 'count' );
+		$args         = array(
+			'taxonomy'   => 'product_cat',
+			'hide_empty' => false,
+			'search'     => $search,
+			'number'     => $per_page,
+			'offset'     => ( $current_page - 1 ) * $per_page,
+			'orderby'    => $term_orderby[ $orderby ] ?? 'name',
+			'order'      => $order,
 		);
+		$terms = get_terms( $args );
+		if ( is_wp_error( $terms ) ) {
+			$this->total_items = 0;
+			return array();
+		}
 
-		return is_wp_error( $terms ) ? array() : $terms;
+		$count_args           = $args;
+		$count_args['fields'] = 'count';
+		$count_args['number'] = 0;
+		$count_args['offset'] = 0;
+		$total                = get_terms( $count_args );
+		$this->total_items    = is_wp_error( $total ) ? 0 : (int) $total;
+		return $terms; // LIMIT/OFFSET is applied by WP_Term_Query.
 	}
 
 	public function getName( $item ) {

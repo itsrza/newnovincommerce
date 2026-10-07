@@ -1,6 +1,6 @@
 <?php
 
-namespace Novinwp\Novin_Commerce\Digits\SmsGateways;
+namespace MobinDev\Novin_Commerce\Digits\SmsGateways;
 
 /**
  * Common contract every SMS gateway integration must follow.

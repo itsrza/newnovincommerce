@@ -1,7 +1,14 @@
 ## 1.20.0
-- تغییر ترتیب منوهای پیشخوان به داشبورد، کالاها، دسته‌بندی‌ها، اشخاص، فاکتورها، همگام‌سازی‌ها، مغایرت‌گیری، ورود/ثبت‌نام موبایلی و تنظیمات.
-- تغییر namespace اصلی پروژه به `Novinwp\Novin_Commerce` و بازسازی نگاشت Composer؛ اطلاعات سازنده به Novinwp و `info@npwp.ir` منتقل شد.
-- نام نمایش افزونه و package به فرمت `NovinCommerce - 1.20.0` و `NovinCommerce-1.20.0.zip` هماهنگ شد.
+- افزودن WebPrd Domain Model مرکزی با parser واحد؛ moduleهای WebPrd دیگر JSON را مستقل parse نمی‌کنند.
+- افزودن `Product_Health_Snapshot` برای Product و Variation با Identity، Inventory، Warehouse، Units، Pricing، Discount، Media، Accounting Nature، Sync و Health.
+- تفکیک `source_mojodi`، `warehouse_stock`، `warehouse_count` و `woo_stock`; scope نامشخص انبار fail-safe است.
+- Multi-Unit فقط با تعریف Accounting، conversion معتبر و mapping بدون ابهام فعال می‌شود؛ Variable Parent منبع stock مستقل نیست.
+- افزودن origin قیمت نقش (`accounting`, `manual`, `inherited`, `legacy`, `unknown`) و پاک‌سازی محدود Accounting Sale/role price.
+- بازنویسی Dashboard به read-only Health Snapshot با queryهای bounded، Product/Variation mix جدا و Action Center دارای Count/Description/Action.
+- افزودن backfill صریح، fixtureهای NP567/Saffron/iPhone/Shirt/Discount/PriceLevel/Composite و تست‌های concurrency queue/snapshot.
+- **وضعیت انتشار: NOT PRODUCTION READY** تا اجرای runtime matrix، migration، PHPUnit، PHPCS و PHPStan روی staging.
+- تغییر namespace اصلی پروژه به `MobinDev\Novin_Commerce` و بازسازی نگاشت Composer؛ اطلاعات سازنده به MobinDev و `mobin7332@gmail.com` منتقل شد.
+- نام نمایش افزونه به `NovinCommerce - 1.20.0` و artifact انتشار به `NovinCommerce-1.20.0-hardened.zip` هماهنگ شد.
 
 ## 1.19.0
 - غیرفعال‌سازی واقعی و پیش‌فرض بخش ورود/ثبت‌نام موبایلی: تا زمان فعال‌سازی صریح Digits، هیچ فرم OTP، endpoint احراز هویت، page-capture یا فیلتر تلفن ووکامرس ثبت نمی‌شود؛ صفحه تنظیمات و migration همچنان در دسترس می‌مانند.

@@ -8,20 +8,20 @@
  * registers the activation and deactivation functions, and defines a function
  * that starts the plugin.
  *
- * @link              http://npwp.ir
+ * @link              http://mobindev.ir
  * @since             1.0.0
  * @package           Novin_Commerce
  *
  * @wordpress-plugin
  * Plugin Name:       NovinCommerce - 1.20.0
- * Plugin URI:        https://npwp.ir/
+ * Plugin URI:        http://mobindev.ir/
  * Description:       Connect novin accounting app to woocommerce.
  * Version:           1.20.0
- * Requires PHP:      7.4
+ * Requires PHP:      8.3
  * Requires at least: 6.1
  * Requires Plugins:  woocommerce
- * Author:            Novinwp
- * Author URI:        https://npwp.ir/
+ * Author:            MobinDev
+ * Author URI:        http://mobindev.ir/
  * License:           GPL-2.0+
  * License URI:       http://www.gnu.org/licenses/gpl-2.0.txt
  * Text Domain:       novin-commerce
@@ -41,13 +41,13 @@ if ( ! defined( 'WPINC' ) ) {
  * The code that runs during plugin activation.
  * This action is documented in lib/Activator.php
  */
-\register_activation_hook( __FILE__, '\Novinwp\Novin_Commerce\Activator::activate' );
+\register_activation_hook( __FILE__, '\MobinDev\Novin_Commerce\Activator::activate' );
 
 /**
  * The code that runs during plugin deactivation.
  * This action is documented in lib/Deactivator.php
  */
-\register_deactivation_hook( __FILE__, '\Novinwp\Novin_Commerce\Deactivator::deactivate' );
+\register_deactivation_hook( __FILE__, '\MobinDev\Novin_Commerce\Deactivator::deactivate' );
 
 add_action( 'wp_ajax_remove_guid', function () {
     if ( ! current_user_can( 'manage_woocommerce' ) ) {
@@ -116,14 +116,14 @@ add_action( 'wp_ajax_remove_guid', function () {
             break;
     }
 
-    if ( class_exists( '\Novinwp\Novin_Commerce\Common\SyncLog' ) ) {
-        \Novinwp\Novin_Commerce\Common\SyncLog::add( 'disconnect', 'success', $item_type, $item_id, 'ارتباط مورد با حسابداری قطع شد.' );
+    if ( class_exists( '\MobinDev\Novin_Commerce\Common\SyncLog' ) ) {
+        \MobinDev\Novin_Commerce\Common\SyncLog::add( 'disconnect', 'success', $item_type, $item_id, 'ارتباط مورد با حسابداری قطع شد.' );
     }
     delete_transient( 'novin_commerce_health_v1' );
     delete_transient( 'novin_commerce_health_v2' );
 
-    if ( class_exists( '\Novinwp\Novin_Commerce\Admin\Mismatch_Page' ) ) {
-        \Novinwp\Novin_Commerce\Admin\Mismatch_Page::clearCache();
+    if ( class_exists( '\MobinDev\Novin_Commerce\Admin\Mismatch_Page' ) ) {
+        \MobinDev\Novin_Commerce\Admin\Mismatch_Page::clearCache();
     }
 
     wp_send_json_success( array( 'message' => 'ارتباط با حسابداری قطع شد و متاها حذف شدند.' ) );
@@ -159,9 +159,9 @@ add_action( 'before_woocommerce_init', function () {
  */
 \add_action( 'plugins_loaded', function () {
 	/**
-	 * @var $_novin_commerce \Novinwp\Novin_Commerce\Plugin
+	 * @var $_novin_commerce \MobinDev\Novin_Commerce\Plugin
 	 */
 	global $_novin_commerce;
-    $_novin_commerce = new \Novinwp\Novin_Commerce\Plugin();
+    $_novin_commerce = new \MobinDev\Novin_Commerce\Plugin();
     $_novin_commerce->run();
 } );

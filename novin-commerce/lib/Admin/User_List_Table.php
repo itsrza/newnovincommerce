@@ -1,8 +1,8 @@
 <?php
 
-namespace Novinwp\Novin_Commerce\Admin;
+namespace MobinDev\Novin_Commerce\Admin;
 
-use Novinwp\Novin_Commerce\Common\Text_Encoding;
+use MobinDev\Novin_Commerce\Common\Text_Encoding;
 use Morilog\Jalali\Jalalian;
 
 class User_List_Table extends List_Table {
@@ -64,13 +64,25 @@ class User_List_Table extends List_Table {
 	}
 
 	public function fetchTableData() {
-		$search = isset( $_REQUEST['s'] ) ? sanitize_text_field( wp_unslash( trim( (string) $_REQUEST['s'] ) ) ) : '';
-
-		return get_users(
+		$search       = isset( $_REQUEST['s'] ) ? sanitize_text_field( wp_unslash( trim( (string) $_REQUEST['s'] ) ) ) : '';
+		$per_page     = min( 100, max( 1, (int) $this->get_items_per_page( 'per_page', 20 ) ) );
+		$current_page     = max( 1, (int) $this->get_pagenum() );
+		$requested_orderby = isset( $_REQUEST['orderby'] ) ? sanitize_key( wp_unslash( $_REQUEST['orderby'] ) ) : 'id';
+		$requested_order   = isset( $_REQUEST['order'] ) && 'desc' === strtolower( (string) wp_unslash( $_REQUEST['order'] ) ) ? 'DESC' : 'ASC';
+		$order_map         = array( 'id' => 'ID', 'name' => 'display_name', 'login' => 'user_login' );
+		$query        = new \WP_User_Query(
 			array(
-				'search' => $search,
+				'search'         => $search ? '*' . $search . '*' : '',
+				'search_columns' => array( 'user_login', 'user_nicename', 'display_name', 'user_email' ),
+				'number'         => $per_page,
+				'offset'         => ( $current_page - 1 ) * $per_page,
+				'count_total'    => true,
+				'orderby'        => $order_map[ $requested_orderby ] ?? 'ID',
+				'order'          => $requested_order,
 			)
 		);
+		$this->total_items = (int) $query->get_total();
+		return (array) $query->get_results();
 	}
 
 	public function getName( $item ) {

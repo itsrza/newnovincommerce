@@ -1,7 +1,7 @@
 <?php
 
 
-namespace Novinwp\Novin_Commerce\Common;
+namespace MobinDev\Novin_Commerce\Common;
 
 
 class SettingAPI
@@ -79,12 +79,24 @@ class SettingAPI
 	public static function getSecret($name, $default = '')
 	{
 		$value = self::get($name, $default);
-		if (class_exists('\\Novinwp\\Novin_Commerce\\Digits\\Common\\Secret_Crypt')) {
-			$decrypted = \Novinwp\Novin_Commerce\Digits\Common\Secret_Crypt::decrypt((string) $value);
+		if (class_exists('\MobinDev\\Novin_Commerce\\Digits\\Common\\Secret_Crypt')) {
+			$decrypted = \MobinDev\Novin_Commerce\Digits\Common\Secret_Crypt::decrypt((string) $value);
 			return '' === $decrypted && '' !== (string) $value ? $default : $decrypted;
 		}
 
 		return $value;
+	}
+
+	/**
+	 * Whether a sensitive option has a stored value, without returning it.
+	 *
+	 * @param string $name Setting name.
+	 * @return bool
+	 */
+	public static function hasSecret($name)
+	{
+		$value = self::get($name, '');
+		return is_string($value) && '' !== trim($value);
 	}
 
 	/**
@@ -96,11 +108,41 @@ class SettingAPI
 	 */
 	public static function setSecret($name, $value)
 	{
-		if (class_exists('\\Novinwp\\Novin_Commerce\\Digits\\Common\\Secret_Crypt')) {
-			$value = \Novinwp\Novin_Commerce\Digits\Common\Secret_Crypt::encrypt((string) $value);
+		if ( ! class_exists('\MobinDev\\Novin_Commerce\\Digits\\Common\\Secret_Crypt') ) {
+			return false;
 		}
 
-		return self::set($name, $value);
+		$encrypted = \MobinDev\Novin_Commerce\Digits\Common\Secret_Crypt::encrypt((string) $value);
+		if ( false === $encrypted ) {
+			// Never persist a plaintext credential when authenticated
+			// encryption is unavailable or the deployment key is missing.
+			return false;
+		}
+
+		return self::set($name, $encrypted);
+	}
+
+	/**
+	 * Replace a legacy plaintext/CBC value only after the new format has been
+	 * produced successfully. The old option remains untouched on any failure.
+	 *
+	 * @param string $name Setting name.
+	 * @return bool True when no migration is needed or migration completed.
+	 */
+	public static function migrateSecret($name)
+	{
+		if ( ! class_exists('\MobinDev\\Novin_Commerce\\Digits\\Common\\Secret_Crypt') ) {
+			return false;
+		}
+		$stored = self::get($name, '');
+		if ( ! \MobinDev\Novin_Commerce\Digits\Common\Secret_Crypt::needs_migration( $stored ) ) {
+			return true;
+		}
+		$plain = \MobinDev\Novin_Commerce\Digits\Common\Secret_Crypt::decrypt( $stored );
+		if ( '' === $plain ) {
+			return false;
+		}
+		return self::setSecret( $name, $plain );
 	}
 
 	private function save()

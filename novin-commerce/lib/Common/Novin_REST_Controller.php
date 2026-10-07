@@ -1,10 +1,10 @@
 <?php
 
-namespace Novinwp\Novin_Commerce\Common;
+namespace MobinDev\Novin_Commerce\Common;
 
 use Carbon\Carbon;
-use Novinwp\Novin_Commerce\Models\Sync;
-use Novinwp\Novin_Commerce\Plugin;
+use MobinDev\Novin_Commerce\Models\Sync;
+use MobinDev\Novin_Commerce\Plugin;
 use Morilog\Jalali\Jalalian;
 
 class Novin_REST_Controller extends \WC_REST_CRUD_Controller {
@@ -414,7 +414,7 @@ class Novin_REST_Controller extends \WC_REST_CRUD_Controller {
 	public function getCustomersIds( $request ) {
 		global $wpdb;
 
-		$limit  = max( 1, (int) $request->get_param( 'per_page' ) );
+		$limit  = min( 100, max( 1, (int) $request->get_param( 'per_page' ) ) );
 		$page   = max( 1, (int) $request->get_param( 'page' ) );
 		$offset = ( $page - 1 ) * $limit;
 		$by_guid = (bool) $request->get_param( 'guid' );
@@ -653,7 +653,7 @@ class Novin_REST_Controller extends \WC_REST_CRUD_Controller {
 			return $this->getPostsIds( $request, 'shop_order' );
 		}
 
-		$limit     = max( 1, (int) $request->get_param( 'per_page' ) );
+		$limit     = min( 100, max( 1, (int) $request->get_param( 'per_page' ) ) );
 		$page      = max( 1, (int) $request->get_param( 'page' ) );
 		$date_from = $request->get_param( 'modified_date_from' );
 		$date_to   = $request->get_param( 'modified_date_to' );
@@ -707,7 +707,7 @@ class Novin_REST_Controller extends \WC_REST_CRUD_Controller {
 	public function getCategoriesIds( $request ) {
 		global $wpdb;
 
-		$limit  = max( 1, (int) $request->get_param( 'per_page' ) );
+		$limit  = min( 100, max( 1, (int) $request->get_param( 'per_page' ) ) );
 		$page   = max( 1, (int) $request->get_param( 'page' ) );
 		$offset = ( $page - 1 ) * $limit;
 
@@ -745,7 +745,7 @@ class Novin_REST_Controller extends \WC_REST_CRUD_Controller {
 	public function getPostsIds( $request, $post_type ) {
 		global $wpdb;
 
-		$limit     = max( 1, (int) $request->get_param( 'per_page' ) );
+		$limit     = min( 100, max( 1, (int) $request->get_param( 'per_page' ) ) );
 		$page      = max( 1, (int) $request->get_param( 'page' ) );
 		$offset    = ( $page - 1 ) * $limit;
 		$date_from = $request->get_param( 'modified_date_from' );
@@ -802,12 +802,16 @@ class Novin_REST_Controller extends \WC_REST_CRUD_Controller {
 	 * @return \WP_Error|\WP_REST_Response
 	 */
 	public function setSyncTime( $request ) {
-		$datetime = $request->get_param( 'datetime' );
-		$jalali   = Jalalian::fromDateTime( $datetime );
+		$datetime = sanitize_text_field( (string) $request->get_param( 'datetime' ) );
+		try {
+			$jalali = Jalalian::fromDateTime( $datetime );
+		} catch ( \Throwable $exception ) {
+			return new \WP_Error( 'invalid_datetime', 'Datetime is not valid.', array( 'status' => 400 ) );
+		}
 		if ( $jalali ) {
 			$saved = SettingAPI::set( 'sync_datetime', $jalali->getTimestamp() );
 			if ( $saved ) {
-				\Novinwp\Novin_Commerce\Common\SyncLog::add( 'sync_datetime', 'success', '', 0, 'زمان مرجع Sync از طریق API تغییر کرد.', [ 'datetime' => $datetime ] );
+				\MobinDev\Novin_Commerce\Common\SyncLog::add( 'sync_datetime', 'success', '', 0, 'زمان مرجع Sync از طریق API تغییر کرد.', [ 'datetime' => $datetime ] );
 				delete_transient( 'novin_commerce_health_v1' );
 			}
 			if ( ! $saved ) {
@@ -842,7 +846,21 @@ class Novin_REST_Controller extends \WC_REST_CRUD_Controller {
 			return new \WP_Error( 404, 'Sync Item not founds' );
 		}
 
-		return $sync_item;
+		// Do not serialize the model wholesale: last_error/context fields may
+		// contain provider diagnostics. Return only operational fields.
+		return new \WP_REST_Response(
+			array(
+				'id'           => absint( $sync_item->id ),
+				'item_id'      => absint( $sync_item->item_id ),
+				'item_type'    => sanitize_key( $sync_item->item_type ),
+				'priority'     => (int) $sync_item->priority,
+				'status'       => sanitize_key( $sync_item->status ),
+				'attempts'     => (int) $sync_item->attempts,
+				'available_at' => (string) $sync_item->available_at,
+				'created_at'   => (string) $sync_item->created_at,
+				'updated_at'   => (string) $sync_item->updated_at,
+			)
+		);
 
 	}
 
@@ -862,11 +880,12 @@ class Novin_REST_Controller extends \WC_REST_CRUD_Controller {
 	}
 
 	public function getItemsSyncs( $request, $type ) {
-		$limit  = max( 1, (int) $request->get_param( 'per_page' ) );
+		$limit  = min( 100, max( 1, (int) $request->get_param( 'per_page' ) ) );
 		$page   = max( 1, (int) $request->get_param( 'page' ) );
 		$offset = ( $page - 1 ) * $limit;
 		$data   = Sync::where( 'item_type', $type )->orderBy( 'priority', 'desc' )->orderBy( 'id', 'asc' )->offset( $offset )->limit( $limit )->get();
 		$total  = Sync::where( 'item_type', $type )->count();
+		$data   = array_map( array( $this, 'serialize_sync_item' ), (array) $data );
 
 		return new \WP_REST_Response( $data, 200, [
 			'X-WP-Total'      => $total,
@@ -922,7 +941,7 @@ class Novin_REST_Controller extends \WC_REST_CRUD_Controller {
 				'type'              => 'integer',
 				'default'           => 10,
 				'minimum'           => 1,
-				'maximum'           => 50000,
+				'maximum'           => 100,
 				'sanitize_callback' => 'absint',
 				'validate_callback' => 'rest_validate_request_arg',
 			),
@@ -956,7 +975,7 @@ class Novin_REST_Controller extends \WC_REST_CRUD_Controller {
 				'type'              => 'integer',
 				'default'           => 10,
 				'minimum'           => 1,
-				'maximum'           => 50000,
+				'maximum'           => 100,
 				'sanitize_callback' => 'absint',
 				'validate_callback' => 'rest_validate_request_arg',
 			),
@@ -988,10 +1007,24 @@ class Novin_REST_Controller extends \WC_REST_CRUD_Controller {
 				'type'              => 'integer',
 				'default'           => 10,
 				'minimum'           => 1,
-				'maximum'           => 50000,
+				'maximum'           => 100,
 				'sanitize_callback' => 'absint',
 				'validate_callback' => 'rest_validate_request_arg',
 			),
+		);
+	}
+
+	private function serialize_sync_item( $sync_item ) {
+		return array(
+			'id'           => absint( $sync_item->id ),
+			'item_id'      => absint( $sync_item->item_id ),
+			'item_type'    => sanitize_key( $sync_item->item_type ),
+			'priority'     => (int) $sync_item->priority,
+			'status'       => sanitize_key( $sync_item->status ),
+			'attempts'     => (int) $sync_item->attempts,
+			'available_at' => (string) $sync_item->available_at,
+			'created_at'   => (string) $sync_item->created_at,
+			'updated_at'   => (string) $sync_item->updated_at,
 		);
 	}
 
@@ -1010,7 +1043,7 @@ class Novin_REST_Controller extends \WC_REST_CRUD_Controller {
 				'type'              => 'integer',
 				'default'           => 10,
 				'minimum'           => 1,
-				'maximum'           => 50000,
+				'maximum'           => 100,
 				'sanitize_callback' => 'absint',
 				'validate_callback' => 'rest_validate_request_arg',
 			),

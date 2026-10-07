@@ -1,6 +1,8 @@
 <?php
 
-namespace Novinwp\Novin_Commerce\RolePrice;
+namespace MobinDev\Novin_Commerce\RolePrice;
+
+use MobinDev\Novin_Commerce\Common\Accounting\Product_Health_Snapshot;
 
 if ( ! defined( 'ABSPATH' ) ) {
     exit;
@@ -10,7 +12,7 @@ final class Bootstrap {
     private static $booted = false;
 
     public static function boot() {
-        if ( self::$booted || ! class_exists( '\\WooCommerce' ) ) {
+        if ( self::$booted || ! class_exists( '\WooCommerce' ) ) {
             return;
         }
 
@@ -20,8 +22,9 @@ final class Bootstrap {
         // WCPBR_VERSION; imported products still need this module's fields
         // and Festi-compatible price reader.
         self::$booted = true;
-        if ( class_exists( '\\Novinwp\\Novin_Commerce\\Common\\Currency_Conversion' ) ) {
-            \Novinwp\Novin_Commerce\Common\Currency_Conversion::boot();
+        Product_Health_Snapshot::boot();
+        if ( class_exists( '\MobinDev\\Novin_Commerce\\Common\\Currency_Conversion' ) ) {
+            \MobinDev\Novin_Commerce\Common\Currency_Conversion::boot();
         }
 
         $files = array(

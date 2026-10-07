@@ -6,12 +6,12 @@
 
 **نسخه:** 1.20.0 | **زبان:** فارسی | **پلتفرم:** وردپرس + ووکامرس
 
-[![Requires PHP](https://img.shields.io/badge/PHP-7.4%2B-777BB4?style=flat-square&logo=php)](https://php.net)
+[![Requires PHP](https://img.shields.io/badge/PHP-8.3%2B-777BB4?style=flat-square&logo=php)](https://php.net)
 [![Requires WordPress](https://img.shields.io/badge/WordPress-6.1%2B-21759B?style=flat-square&logo=wordpress)](https://wordpress.org)
 [![Requires WooCommerce](https://img.shields.io/badge/WooCommerce-Required-96588A?style=flat-square&logo=woocommerce)](https://woocommerce.com)
 [![License](https://img.shields.io/badge/License-GPLv2%2B-blue?style=flat-square)](LICENSE.txt)
 
-[طراحی و ارتباط سایت با حسابداری نوین پرداز](https://npwp.ir) • [توضیحات محصول](https://npwp.ir/our-services/)
+[طراحی و ارتباط سایت با حسابداری نوین پرداز](http://mobindev.ir) • [توضیحات محصول](http://mobindev.ir/our-services/)
 
 </div>
 
@@ -21,7 +21,7 @@
 
 **نوین کامرس** یک افزونه واسط برای وردپرس است. این افزونه، فروشگاه اینترنتی ووکامرس را با [نرم‌افزار حسابداری نوین‌پرداز](https://novinacc.ir/) به‌طور خودکار همگام‌سازی می‌کند. با این افزونه، مدیر فروشگاه دیگر نیازی به وارد کردن دستی اطلاعات کالاها، اشخاص و فاکتورها در دو سیستم جداگانه ندارد. اطلاعات بین حسابداری و فروشگاه، به‌صورت دوطرفه و خودکار جریان می‌یابد.
 
-> برای استفاده از این افزونه، داشتن نرم‌افزار حسابداری نوین‌پرداز الزامی است. برای خرید و دریافت مشاوره، با کارشناسان فروش نوین‌پرداز از طریق صفحه [ارتباط با ما](https://npwp.ir/contact-us/) در ارتباط باشید.
+> برای استفاده از این افزونه، داشتن نرم‌افزار حسابداری نوین‌پرداز الزامی است. برای خرید و دریافت مشاوره، با کارشناسان فروش نوین‌پرداز از طریق صفحه [ارتباط با ما](http://mobindev.ir/contact-us/) در ارتباط باشید.
 
 ---
 
@@ -106,9 +106,9 @@ novin-commerce/
 - ✅ نصب و راه‌اندازی **نرم‌افزار حسابداری نوین‌پرداز** (مشاوره و خرید از طریق [novinacc.ir](https://novinacc.ir))
 - ✅ وردپرس نسخه 6.1 یا بالاتر
 - ✅ افزونه ووکامرس فعال و پیکربندی‌شده
-- ✅ PHP نسخه 7.4 یا بالاتر
+- ✅ PHP نسخه 8.3 یا 8.4
 
-> ⚠️ این افزونه بدون داشتن نرم‌افزار حسابداری نوین‌پرداز کاربردی ندارد. برای خرید و دریافت اطلاعات بیشتر، حتماً با کارشناسان فروش نوین‌پرداز از طریق [صفحه خدمات ما](https://npwp.ir/contact-us/) در ارتباط باشید.
+> ⚠️ این افزونه بدون داشتن نرم‌افزار حسابداری نوین‌پرداز کاربردی ندارد. برای خرید و دریافت اطلاعات بیشتر، حتماً با کارشناسان فروش نوین‌پرداز از طریق [صفحه خدمات ما](http://mobindev.ir/contact-us/) در ارتباط باشید.
 
 ---
 
@@ -125,8 +125,8 @@ novin-commerce/
 
 برای دریافت مشاوره فروش، پشتیبانی فنی یا اطلاعات بیشتر درباره نرم‌افزار حسابداری نوین‌پرداز:
 
-- 🌐 وب‌سایت اصلی: **[npwp.ir](https://npwp.ir)**
-- 🛎️ توضیحات محصول: **[npwp.ir/our-services](https://npwp.ir/our-services/)**
+- 🌐 وب‌سایت اصلی: **[mobindev.ir](http://mobindev.ir)**
+- 🛎️ توضیحات محصول: **[mobindev.ir/our-services](http://mobindev.ir/our-services/)**
 - 🧾 نرم‌افزار حسابداری: **[حسابداری نوین پرداز](https://novinacc.ir)**
 
 ---

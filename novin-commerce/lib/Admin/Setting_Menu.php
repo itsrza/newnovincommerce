@@ -1,12 +1,13 @@
 <?php
 
-namespace Novinwp\Novin_Commerce\Admin;
+namespace MobinDev\Novin_Commerce\Admin;
 
-use Novinwp\Novin_Commerce\Common\Currency_Conversion;
-use Novinwp\Novin_Commerce\Common\SettingAPI;
-use Novinwp\Novin_Commerce\Plugin;
+use MobinDev\Novin_Commerce\Common\Currency_Conversion;
+use MobinDev\Novin_Commerce\Common\SettingAPI;
+use MobinDev\Novin_Commerce\Plugin;
 
 class Setting_Menu {
+	const PASSWORD_MASK = '********';
 	private $plugin;
 
 	public function __construct( Plugin $plugin ) {
@@ -18,6 +19,7 @@ class Setting_Menu {
 	}
 
 	public function save() {
+		$secret_saved = true;
 		if ( isset( $_POST['novin_save_admin_access'] ) && class_exists( 'NovinCommerce_RolePrice_Settings' ) ) {
 			if ( ! isset( $_POST['_wpnonce'] ) || ! wp_verify_nonce( sanitize_text_field( wp_unslash( $_POST['_wpnonce'] ) ), 'novin-role-access' ) ) {
 				return;
@@ -57,6 +59,10 @@ class Setting_Menu {
 		$tracking              = isset( $_POST['woocommerce_allow_tracking'] ) ? sanitize_key( wp_unslash( $_POST['woocommerce_allow_tracking'] ) ) : 'no';
 		$marketplace           = isset( $_POST['woocommerce_show_marketplace_suggestions'] ) ? sanitize_key( wp_unslash( $_POST['woocommerce_show_marketplace_suggestions'] ) ) : 'no';
 		$api_url               = isset( $_POST['api_url'] ) ? esc_url_raw( wp_unslash( $_POST['api_url'] ) ) : SettingAPI::get( 'api_url', '' );
+		$warehouse_mode        = isset( $_POST['warehouse_scope_mode'] ) ? sanitize_key( wp_unslash( $_POST['warehouse_scope_mode'] ) ) : SettingAPI::get( 'warehouse_scope_mode', 'unknown' );
+		$warehouse_ids         = isset( $_POST['warehouse_scope_ids'] ) ? sanitize_text_field( wp_unslash( $_POST['warehouse_scope_ids'] ) ) : SettingAPI::get( 'warehouse_scope_ids', array() );
+		if ( ! in_array( $warehouse_mode, array( 'all', 'configured', 'unknown' ), true ) ) $warehouse_mode = 'unknown';
+		if ( is_array( $warehouse_ids ) ) $warehouse_ids = implode( ',', array_map( 'sanitize_text_field', $warehouse_ids ) );
 
 		if ( ! in_array( $woocommerce_analytics, array( 'on', 'off' ), true ) ) {
 			$woocommerce_analytics = 'off';
@@ -80,6 +86,8 @@ class Setting_Menu {
 				'woocommerce_analytics'          => $woocommerce_analytics,
 				'api_user'                       => isset( $_POST['api_user'] ) ? trim( sanitize_text_field( wp_unslash( $_POST['api_user'] ) ) ) : SettingAPI::get( 'api_user', '' ),
 				'api_url'                        => $api_url,
+				'warehouse_scope_mode'           => $warehouse_mode,
+				'warehouse_scope_ids'            => $warehouse_ids,
 				'novin_toman_conversion_enabled' => isset( $_POST['novin_toman_conversion_enabled'] ) ? 'on' : 'off',
 			)
 		);
@@ -102,16 +110,25 @@ class Setting_Menu {
 		}
 
 		if ( isset( $_POST['api_pass'] ) ) {
-			// The field is intentionally plain text in the UI. The option still
-			// follows the encrypted Secret_Crypt path and old plain values remain
-			// readable for backwards compatibility.
-			SettingAPI::setSecret( 'api_pass', trim( sanitize_text_field( wp_unslash( $_POST['api_pass'] ) ) ) );
+			$api_pass = trim( sanitize_text_field( wp_unslash( $_POST['api_pass'] ) ) );
+			// Empty/masked means preserve the existing ciphertext. If the
+			// existing value is legacy data, migrate it only after encryption
+			// succeeds; a missing key leaves the original value untouched.
+			if ( '' === $api_pass || self::PASSWORD_MASK === $api_pass ) {
+				$secret_saved = SettingAPI::migrateSecret( 'api_pass' );
+			} elseif ( ! SettingAPI::setSecret( 'api_pass', $api_pass ) ) {
+				$secret_saved = false;
+			}
 		}
 
 		update_option( 'woocommerce_allow_tracking', $tracking );
 		update_option( 'woocommerce_show_marketplace_suggestions', $marketplace );
 
-		AdminNotice::addSuccessDismissible( 'تنظیمات با موفقیت ذخیره شد.', 2 );
+		if ( $secret_saved ) {
+			AdminNotice::addSuccessDismissible( 'تنظیمات با موفقیت ذخیره شد.', 2 );
+		} else {
+			AdminNotice::addErrorDismissible( 'تنظیمات ذخیره شد، اما رمز اتصال به‌دلیل نبود کلید رمزنگاری ذخیره نشد.', 2 );
+		}
 		$tab = isset( $_POST['novin_settings_tab'] ) ? sanitize_key( wp_unslash( $_POST['novin_settings_tab'] ) ) : 'general';
 		wp_safe_redirect( add_query_arg( 'tab', $tab, admin_url( 'admin.php?page=novin-commerce-settings' ) ) );
 		exit;
@@ -160,6 +177,8 @@ class Setting_Menu {
 						<tr><th><label for="woocommerce_allow_tracking">رهگیری WooCommerce</label></th><td><select name="woocommerce_allow_tracking" id="woocommerce_allow_tracking"><option value="yes" <?php selected( get_option( 'woocommerce_allow_tracking' ), 'yes' ); ?>>فعال</option><option value="no" <?php selected( get_option( 'woocommerce_allow_tracking' ), 'no' ); ?>>غیرفعال</option></select><p class="description">کنترل ارسال داده‌های رهگیری WooCommerce.</p></td></tr>
 						<tr><th><label for="woocommerce_show_marketplace_suggestions">پیشنهادهای Marketplace</label></th><td><select name="woocommerce_show_marketplace_suggestions" id="woocommerce_show_marketplace_suggestions"><option value="yes" <?php selected( get_option( 'woocommerce_show_marketplace_suggestions' ), 'yes' ); ?>>فعال</option><option value="no" <?php selected( get_option( 'woocommerce_show_marketplace_suggestions' ), 'no' ); ?>>غیرفعال</option></select><p class="description">کنترل پیشنهادهای Marketplace در پنل WooCommerce.</p></td></tr>
 						<tr><th><label for="novin_toman_conversion_enabled">تبدیل ریال به تومان</label></th><td><label><input type="checkbox" id="novin_toman_conversion_enabled" name="novin_toman_conversion_enabled" value="on" <?php checked( Currency_Conversion::is_enabled(), true ); ?>> قیمت‌ها هنگام نمایش و محاسبه بر ۱۰ تقسیم شوند</label><p class="description">قیمت خام محصولات و نقش‌ها در حسابداری به ریال باقی می‌ماند؛ این گزینه واحد نمایش ووکامرس و پنل مدیریت را به تومان تبدیل می‌کند.</p></td></tr>
+						<tr><th><label for="warehouse_scope_mode">محدوده انبار</label></th><td><select name="warehouse_scope_mode" id="warehouse_scope_mode"><option value="unknown" <?php selected( SettingAPI::get( 'warehouse_scope_mode', 'unknown' ), 'unknown' ); ?>>نامشخص و Fail-safe</option><option value="all" <?php selected( SettingAPI::get( 'warehouse_scope_mode', 'unknown' ), 'all' ); ?>>تمام انبارهای معتبر</option><option value="configured" <?php selected( SettingAPI::get( 'warehouse_scope_mode', 'unknown' ), 'configured' ); ?>>فقط شناسه‌های انتخاب‌شده</option></select><p class="description">Mojodi هرگز جایگزین مجموع انبار نمی‌شود. برای محاسبه Multi-Unit باید این محدوده صریح باشد.</p></td></tr>
+						<tr><th><label for="warehouse_scope_ids">شناسه انبارها</label></th><td><input class="regular-text" type="text" name="warehouse_scope_ids" id="warehouse_scope_ids" value="<?php echo esc_attr( is_array( SettingAPI::get( 'warehouse_scope_ids', array() ) ) ? implode( ',', SettingAPI::get( 'warehouse_scope_ids', array() ) ) : SettingAPI::get( 'warehouse_scope_ids', '' ) ); ?>"><p class="description">GUID انبارها را با comma جدا کنید؛ فقط در حالت «فقط شناسه‌های انتخاب‌شده» استفاده می‌شود.</p></td></tr>
 					</table>
 				</section>
 
@@ -168,7 +187,7 @@ class Setting_Menu {
 					<p class="description">اطلاعات اتصال NovinCommerce به سرویس‌های مورد استفاده سیستم تبادل.</p>
 					<table class="form-table" role="presentation">
 						<tr><th><label for="api_user">نام کاربری</label></th><td><input class="regular-text" type="text" value="<?php echo esc_attr( SettingAPI::get( 'api_user', '' ) ); ?>" name="api_user" id="api_user" autocomplete="off"></td></tr>
-						<tr><th><label for="api_pass">رمز عبور</label></th><td><input class="regular-text" type="text" value="<?php echo esc_attr( SettingAPI::getSecret( 'api_pass', '' ) ); ?>" name="api_pass" id="api_pass" autocomplete="off"></td></tr>
+						<tr><th><label for="api_pass">رمز عبور</label></th><td><input class="regular-text" type="password" value="<?php echo SettingAPI::hasSecret( 'api_pass' ) ? esc_attr( self::PASSWORD_MASK ) : ''; ?>" name="api_pass" id="api_pass" autocomplete="new-password" placeholder="برای تغییر وارد کنید؛ برای حفظ مقدار فعلی خالی بگذارید"></td></tr>
 						<tr><th><label for="api_url">سرور</label></th><td><select name="api_url" id="api_url"><?php foreach ( self::getApiUrls() as $url => $label ) : ?><option value="<?php echo esc_attr( $url ); ?>" <?php selected( SettingAPI::get( 'api_url' ), $url ); ?>><?php echo esc_html( $label ); ?></option><?php endforeach; ?></select></td></tr>
 					</table>
 				</section>

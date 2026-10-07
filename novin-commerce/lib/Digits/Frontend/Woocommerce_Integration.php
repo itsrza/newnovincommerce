@@ -1,9 +1,9 @@
 <?php
 
-namespace Novinwp\Novin_Commerce\Digits\Frontend;
+namespace MobinDev\Novin_Commerce\Digits\Frontend;
 
-use Novinwp\Novin_Commerce\Digits\Common\Digits_Settings;
-use Novinwp\Novin_Commerce\Plugin;
+use MobinDev\Novin_Commerce\Digits\Common\Digits_Settings;
+use MobinDev\Novin_Commerce\Plugin;
 
 /**
  * WooCommerce-facing behavior for the Digits module: autofilling the

@@ -1,28 +1,28 @@
 {
-    "name": "novinwp/novin-commerce",
+    "name": "mobindev/novin-commerce",
     "description": "Connect novin accounting app to woocommerce.",
     "type": "wordpress-plugin",
     "keywords": ["wordpress", "plugin"],
-    "homepage": "https://npwp.ir/",
+    "homepage": "http://mobindev.ir/",
     "license": "GPL-2.0+",
     "authors": [
       {
-          "name": "Novinwp",
-          "email": "info@npwp.ir",
-          "homepage": "https://npwp.ir/"
+          "name": "MobinDev",
+          "email": "mobin7332@gmail.com",
+          "homepage": "http://mobindev.ir/"
       }
     ],
     "support": {
-        "issues": "https://npwp.ir/",
-        "source": "https://npwp.ir/"
+        "issues": "http://mobindev.ir/",
+        "source": "http://mobindev.ir/"
     },
     "autoload": {
         "psr-4": {
-            "Novinwp\\Novin_Commerce\\": "lib/"
+            "MobinDev\\Novin_Commerce\\": "lib/"
         }
     },
     "require": {
-        "php": ">=7.4.0",
+        "php": ">=8.3.0",
         "as247/wp-eloquent": "^2.0",
         "morilog/jalali": "3.*"
     },

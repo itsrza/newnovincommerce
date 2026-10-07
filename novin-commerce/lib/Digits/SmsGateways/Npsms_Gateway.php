@@ -1,6 +1,6 @@
 <?php
 
-namespace Novinwp\Novin_Commerce\Digits\SmsGateways;
+namespace MobinDev\Novin_Commerce\Digits\SmsGateways;
 
 /**
  * NPSMS (npsms.com) gateway.
@@ -106,10 +106,12 @@ class Npsms_Gateway implements Sms_Gateway_Interface {
 		);
 
 		if ( is_wp_error( $response ) ) {
+			// Do not return the provider's transport error: it can contain a
+			// URL, credential fragment, proxy detail, or private endpoint.
 			return [
 				'success' => false,
-				'message' => 'خطا در برقراری ارتباط با NPSMS: ' . $response->get_error_message(),
-				'raw'     => $response->get_error_message(),
+				'message' => 'ارتباط با درگاه پیامکی برقرار نشد.',
+				'raw'     => '',
 			];
 		}
 
@@ -122,25 +124,25 @@ class Npsms_Gateway implements Sms_Gateway_Interface {
 		// explicit success marker and no failure marker.
 		$trimmed_body = trim( (string) $body );
 		$decoded_body = html_entity_decode( $trimmed_body, ENT_QUOTES, 'UTF-8' );
-		$is_numeric_success = '' !== $trimmed_body
-			&& is_numeric( $trimmed_body )
-			&& (float) $trimmed_body >= 0;
+		// The endpoint's numeric response codes are not documented reliably
+		// across accounts, so a bare number is deliberately ambiguous and is
+		// not treated as successful. Require an explicit provider success
+		// marker; this prevents an HTML/login/error page with HTTP 200 from
+		// creating a usable OTP.
 		$is_legacy_form = false !== stripos( $decoded_body, 'sendSmsViaURL.aspx' )
 			&& ( false !== stripos( $decoded_body, 'reciverNumber' ) || false !== stripos( $decoded_body, '<form' ) );
 		$has_success_marker = (bool) preg_match( '/(?:\bsuccess(?:ful)?\b|\bsent\b|\baccepted\b|\bmessage\s*id\b|\bsms\s*id\b|ارسال\s*(?:شد|موفق)|موفق)/iu', $decoded_body );
 		$has_failure_marker = (bool) preg_match( '/(?:\berror\b|\bfailed\b|\bfailure\b|\binvalid\b|\bincorrect\b|نامعتبر|خطا|ناموفق|اشتباه)/iu', $decoded_body );
 		$is_legacy_form_success = $is_legacy_form && $has_success_marker && ! $has_failure_marker;
-		$is_success = 200 === (int) $code && ( $is_numeric_success || $is_legacy_form_success );
-		$safe_body = $this->redact_sensitive_response( $trimmed_body );
-
+		$is_success = 200 === (int) $code && $has_success_marker && ! $has_failure_marker && ( ! $is_legacy_form || $is_legacy_form_success );
 		return [
 			'success' => $is_success,
+			// Provider bodies are intentionally not returned. They may echo
+			// request parameters or contain account-specific diagnostics.
 			'message' => $is_success
-				? ( $is_legacy_form_success && ! $is_numeric_success
-					? 'پیامک با موفقیت ارسال شد (پاسخ سازگار NPSMS دریافت شد).'
-					: 'پیامک با موفقیت ارسال شد (پاسخ سرور: ' . $safe_body . ').' )
-				: 'ارسال پیامک ناموفق بود. کد HTTP: ' . (int) $code . '.',
-			'raw'     => $safe_body,
+				? 'پیامک با موفقیت ارسال شد.'
+				: 'ارسال پیامک ناموفق بود. لطفاً دوباره تلاش کنید.',
+			'raw'     => '',
 		];
 	}
 

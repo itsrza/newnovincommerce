@@ -10,7 +10,7 @@
  * @subpackage Novin_Commerce/Frontend
  */
 
-namespace Novinwp\Novin_Commerce;
+namespace MobinDev\Novin_Commerce;
 
 /**
  * The public-facing functionality of the plugin.
@@ -20,7 +20,7 @@ namespace Novinwp\Novin_Commerce;
  *
  * @package    Novin_Commerce
  * @subpackage Novin_Commerce/Frontend
- * @author     Novinwp <info@npwp.ir>
+ * @author     MobinDev <mobin7332@gmail.com>
  */
 class Frontend {
 

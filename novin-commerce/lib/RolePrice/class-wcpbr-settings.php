@@ -1,4 +1,7 @@
 <?php
+
+use MobinDev\Novin_Commerce\Common\Accounting\WebPrd\WebPrd_Parser;
+
 if ( ! defined( 'ABSPATH' ) ) {
 exit;
 }
@@ -712,32 +715,15 @@ return $results;
 
 private function extract_webprd_role_prices( $webprd_raw ) {
 $result = array();
-
-if ( empty( $webprd_raw ) || ! is_string( $webprd_raw ) ) return $result;
-if ( strlen( $webprd_raw ) > 500000 ) return $result;
-
-$data = json_decode( $webprd_raw, true, 10 );
-if ( JSON_ERROR_NONE !== json_last_error() ) return $result;
-if ( ! is_array( $data ) || empty( $data['PriceRoleList'] ) || ! is_array( $data['PriceRoleList'] ) ) return $result;
-
+$parser = WebPrd_Parser::from( $webprd_raw );
+if ( ! $parser->is_valid() ) return $result;
 $map = self::webprd_role_name_map();
-
-foreach ( $data['PriceRoleList'] as $entry ) {
-if ( ! is_array( $entry ) ) continue;
-if ( empty( $entry['WordPressRoleName'] ) || ! is_string( $entry['WordPressRoleName'] ) ) continue;
-if ( ! isset( $entry['Price'] ) ) continue;
-
-$np_name = trim( $entry['WordPressRoleName'] );
-if ( ! isset( $map[ $np_name ] ) ) continue;
-
-$internal_role = $map[ $np_name ];
-$price         = $entry['Price'];
-
-if ( is_numeric( $price ) && (float) $price > 0 ) {
-$result[ $internal_role ] = (string) $price;
+foreach ( $parser->role_prices() as $entry ) {
+$name = isset( $entry['name'] ) ? (string) $entry['name'] : '';
+$price = $entry['price'] ?? null;
+if ( '' === $name || ! isset( $map[ $name ] ) || null === $price ) continue;
+$result[ $map[ $name ] ] = (string) $price;
 }
-}
-
 return $result;
 }
 
