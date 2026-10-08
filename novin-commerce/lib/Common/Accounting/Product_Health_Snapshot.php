@@ -407,6 +407,15 @@ final class Product_Health_Snapshot {
 		$kind_map = SettingAPI::get( 'accounting_kind_map', array() );
 		$kind_key = null !== $production['kind'] ? (string) (int) $production['kind'] : '';
 		$accounting_kind = is_array( $kind_map ) && isset( $kind_map[ $kind_key ] ) ? sanitize_key( $kind_map[ $kind_key ] ) : 'unknown';
+		// These are accounting-nature signals, not WooCommerce type or unit
+		// mode. Preserve them even when the external Kind mapping is absent.
+		if ( ! empty( $production['composite'] ) ) {
+			$accounting_kind = 'composite';
+		} elseif ( '' !== (string) $production['formula_guid'] ) {
+			$accounting_kind = 'formula';
+		} elseif ( null !== $production['production_capacity'] ) {
+			$accounting_kind = 'production';
+		}
 
 		$flags = array();
 		if ( in_array( $identity_state, array( 'guid_mismatch', 'missing_guid' ), true ) ) $flags[] = $identity_state;
@@ -416,6 +425,9 @@ final class Product_Health_Snapshot {
 		if ( 'stale' === $sync_state ) $flags[] = 'stale';
 		if ( 'failed' === $sync_state ) $flags[] = 'sync_failed';
 		if ( $invalid_price > 0 ) $flags[] = 'invalid_accounting_price';
+		if ( ! empty( $production['composite'] ) ) $flags[] = 'composite';
+		if ( '' !== (string) $production['formula_guid'] ) $flags[] = 'production_formula';
+		if ( null !== $production['production_capacity'] ) $flags[] = 'production_capacity';
 		$health_status = self::overall_status( $identity_state, $inventory_state, $pricing_state, $unit_mode, $sync_state, $discount_state, $parser->is_valid() );
 
 		return array(

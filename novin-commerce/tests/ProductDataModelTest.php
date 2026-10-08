@@ -69,6 +69,7 @@ class NovinCommerce_Product_Data_Model_Test extends WP_UnitTestCase {
 		$parser = WebPrd_Parser::from( $this->fixture( 'Composite' ) );
 		$this->assertSame( 7.0, $parser->production()['kind'] );
 		$this->assertSame( 'formula-1', $parser->production()['formula_guid'] );
+		$this->assertTrue( $parser->production()['composite'] );
 		$this->assertNull( $parser->units()['v2_qty'] );
 	}
 

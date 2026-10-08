@@ -329,9 +329,10 @@ final class WebPrd_Parser {
 
 	public function production() {
 		return array(
-			'kind'               => $this->numeric_field( 'Kind' ),
-			'production_capacity'=> $this->numeric_field( 'ProductionCapacity' ),
-			'formula_guid'       => $this->text_field( 'TolidFormulaGuid' ),
+			'kind'                => $this->numeric_field( 'Kind' ),
+			'production_capacity' => $this->numeric_field( 'ProductionCapacity' ),
+			'formula_guid'        => $this->first_text_field( array( 'TolidFormulaGuid', 'TolidFormula' ) ),
+			'composite'           => $this->boolean_field( 'Composite' ),
 		);
 	}
 
@@ -347,6 +348,28 @@ final class WebPrd_Parser {
 
 	private function text_field( $key ) {
 		return $this->scalar_text( $key );
+	}
+
+	private function first_text_field( array $keys ) {
+		foreach ( $keys as $key ) {
+			$value = $this->text_field( $key );
+			if ( '' !== $value ) {
+				return $value;
+			}
+		}
+		return '';
+	}
+
+	private function boolean_field( $key ) {
+		$value = $this->field( $key, null );
+		if ( is_bool( $value ) ) {
+			return $value;
+		}
+		if ( is_numeric( $value ) ) {
+			return 0 !== (int) $value;
+		}
+		$value = strtolower( trim( (string) $value ) );
+		return in_array( $value, array( '1', 'true', 'yes', 'y', 'on' ), true );
 	}
 
 	private function scalar_text( $key ) {
