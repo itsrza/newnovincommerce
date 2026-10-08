@@ -1,9 +1,9 @@
 <?php
 
-namespace Novinwp\Novin_Commerce\Models;
+namespace MobinDev\Novin_Commerce\Models;
 
 use As247\WpEloquent\Database\Eloquent\Model;
-use Novinwp\Novin_Commerce\Common\SyncLog;
+use MobinDev\Novin_Commerce\Common\SyncLog;
 
 /**
  * Persistent, deduplicated sync queue.

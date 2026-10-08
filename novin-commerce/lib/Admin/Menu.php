@@ -1,9 +1,9 @@
 <?php
 
-namespace Novinwp\Novin_Commerce\Admin;
+namespace MobinDev\Novin_Commerce\Admin;
 
-use Novinwp\Novin_Commerce\Models\Sync;
-use Novinwp\Novin_Commerce\Plugin;
+use MobinDev\Novin_Commerce\Models\Sync;
+use MobinDev\Novin_Commerce\Plugin;
 
 class Menu {
 	/**
@@ -143,7 +143,7 @@ class Menu {
 			'مغایرت‌گیری' . $mismatch_badge,
 			'manage_woocommerce',
 			'novin-commerce-mismatch',
-			[ \Novinwp\Novin_Commerce\Admin\Mismatch_Page::class, 'renderPage' ],
+			[ \MobinDev\Novin_Commerce\Admin\Mismatch_Page::class, 'renderPage' ],
 			'60',
 		);
 

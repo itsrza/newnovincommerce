@@ -1,5 +1,5 @@
 <?php
-namespace Novinwp\Novin_Commerce\Common;
+namespace MobinDev\Novin_Commerce\Common;
 
 class SyncLog {
     public static function add( $event, $status = 'info', $item_type = '', $item_id = 0, $message = '', $context = [] ) {

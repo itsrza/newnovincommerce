@@ -1,6 +1,6 @@
 <?php
 
-namespace Novinwp\Novin_Commerce\Admin;
+namespace MobinDev\Novin_Commerce\Admin;
 /**
  * Administration API: WP_List_Table class
  *

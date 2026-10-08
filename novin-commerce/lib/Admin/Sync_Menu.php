@@ -1,7 +1,7 @@
 <?php
-namespace Novinwp\Novin_Commerce\Admin;
+namespace MobinDev\Novin_Commerce\Admin;
 
-use Novinwp\Novin_Commerce\Plugin;
+use MobinDev\Novin_Commerce\Plugin;
 
 class Sync_Menu {
     protected $plugin;

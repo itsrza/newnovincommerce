@@ -1,6 +1,6 @@
 <?php
 
-namespace Novinwp\Novin_Commerce\Admin;
+namespace MobinDev\Novin_Commerce\Admin;
 
 use MobinDev\Novin_Commerce\Common\Accounting\WebPrd\WebPrd_Parser;
 

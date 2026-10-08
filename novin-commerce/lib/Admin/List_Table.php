@@ -1,9 +1,9 @@
 <?php
-namespace Novinwp\Novin_Commerce\Admin;
+namespace MobinDev\Novin_Commerce\Admin;
 
-use Novinwp\Novin_Commerce\Admin\AdminNotice;
+use MobinDev\Novin_Commerce\Admin\AdminNotice;
 use As247\WpEloquent\Database\Eloquent\Collection;
-use Novinwp\Novin_Commerce\Models\Sync;
+use MobinDev\Novin_Commerce\Models\Sync;
 use Morilog\Jalali\Jalalian;
 
 abstract class List_Table extends \WP_List_Table {
@@ -345,19 +345,19 @@ function extra_tablenav($which) {
 				if ( ! in_array( $item['item_type'], [ 'product', 'variation' ], true ) ) continue;
 				if ( ! current_user_can( 'edit_post', $item['item_id'] ) ) continue;
 				foreach ( [ 'guid', '_np-api-sync-date', 'WebPrd' ] as $meta_key ) delete_post_meta( $item['item_id'], $meta_key );
-				\Novinwp\Novin_Commerce\Common\SyncLog::add( 'disconnect', 'success', $item['item_type'], $item['item_id'], 'ارتباط مورد با حسابداری قطع شد.' );
+				\MobinDev\Novin_Commerce\Common\SyncLog::add( 'disconnect', 'success', $item['item_type'], $item['item_id'], 'ارتباط مورد با حسابداری قطع شد.' );
 				$done++;
 			} elseif ( 'requeue' === $action ) {
-				\Novinwp\Novin_Commerce\Models\Sync::requeue( $item['item_id'], $item['item_type'], 10 );
+				\MobinDev\Novin_Commerce\Models\Sync::requeue( $item['item_id'], $item['item_type'], 10 );
 				$done++;
 			} else {
-				\Novinwp\Novin_Commerce\Models\Sync::queueItem( $item['item_id'], $item['item_type'], 10 );
+				\MobinDev\Novin_Commerce\Models\Sync::queueItem( $item['item_id'], $item['item_type'], 10 );
 				$done++;
 			}
 		}
 		delete_transient( 'novin_commerce_health_v1' );
 		if ( $done ) {
-			\Novinwp\Novin_Commerce\Admin\AdminNotice::addSuccessDismissible( sprintf( '%d مورد با موفقیت پردازش شد.', $done ) );
+			\MobinDev\Novin_Commerce\Admin\AdminNotice::addSuccessDismissible( sprintf( '%d مورد با موفقیت پردازش شد.', $done ) );
 		}
 		wp_safe_redirect( wp_get_referer() ?: admin_url( 'admin.php?page=' . rawurlencode( sanitize_key( $_REQUEST['page'] ?? '' ) ) ) );
 		exit;

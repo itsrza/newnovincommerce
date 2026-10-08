@@ -1,6 +1,6 @@
 <?php
 
-namespace Novinwp\Novin_Commerce\Admin;
+namespace MobinDev\Novin_Commerce\Admin;
 
 class Order_List_Table extends List_Table {
 	protected $name = 'order';

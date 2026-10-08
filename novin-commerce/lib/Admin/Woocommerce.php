@@ -1,9 +1,9 @@
 <?php
 
-namespace Novinwp\Novin_Commerce\Admin;
+namespace MobinDev\Novin_Commerce\Admin;
 
-use Novinwp\Novin_Commerce\Common\SettingAPI;
-use Novinwp\Novin_Commerce\Plugin;
+use MobinDev\Novin_Commerce\Common\SettingAPI;
+use MobinDev\Novin_Commerce\Plugin;
 
 class Woocommerce {
 	/**
