@@ -102,9 +102,9 @@ class Activator {
 			} );
 		}
 
-		self::ensureStockOperationTable();
-		self::ensureHealthSnapshotTable();
-		self::ensure_utf8_tables();
+		if ( ! self::ensureStockOperationTable() || ! self::ensureHealthSnapshotTable() || ! self::ensure_utf8_tables() ) {
+			return false;
+		}
 		return Schema::hasTable( 'novin_commerce_syncs' )
 			&& Schema::hasTable( 'novin_commerce_sync_logs' )
 			&& Schema::hasTable( 'novin_commerce_stock_ops' )
@@ -307,8 +307,11 @@ class Activator {
 			if ( '' !== $collate ) {
 				$sql .= " COLLATE {$collate}";
 			}
-			$wpdb->query( $sql ); // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.PreparedSQL.NotPrepared -- identifiers are plugin-owned and charset values are allow-listed.
+			if ( false === $wpdb->query( $sql ) ) { // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.PreparedSQL.NotPrepared -- identifiers are plugin-owned and charset values are allow-listed.
+				return false;
+			}
 		}
+		return true;
 	}
 
 	/**
@@ -458,19 +461,24 @@ class Activator {
 	}
 
 	public static function maybeUpgrade() {
-		Application::bootWp();
-		$version = (string) get_option( 'novin_commerce_schema_version', '' );
-		$ready   = self::createTables() && self::ensureQueueSchema();
-		if ( $ready && self::verifyQueueSchema() && self::CURRENT_SCHEMA === $version ) {
-			self::scheduleMaintenance();
-			return true;
-		}
-		if ( $ready && self::verifyQueueSchema() ) {
-			if ( update_option( 'novin_commerce_schema_version', self::CURRENT_SCHEMA ) ) {
+		try {
+			Application::bootWp();
+			$version = (string) get_option( 'novin_commerce_schema_version', '' );
+			$ready   = self::createTables() && self::ensureQueueSchema();
+			if ( $ready && self::verifyQueueSchema() && self::CURRENT_SCHEMA === $version ) {
 				self::scheduleMaintenance();
 				return true;
 			}
-			return self::CURRENT_SCHEMA === (string) get_option( 'novin_commerce_schema_version', '' );
+			if ( $ready && self::verifyQueueSchema() ) {
+				if ( update_option( 'novin_commerce_schema_version', self::CURRENT_SCHEMA ) ) {
+					self::scheduleMaintenance();
+					return true;
+				}
+				return self::CURRENT_SCHEMA === (string) get_option( 'novin_commerce_schema_version', '' );
+			}
+		} catch ( \Throwable $exception ) {
+			// Keep the prior schema version and allow the next admin/cron retry.
+			return false;
 		}
 		return false;
 	}

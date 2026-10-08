@@ -162,6 +162,10 @@ final class Product_Health_Snapshot {
 			'ready' => false,
 			'catalog' => array( 'products' => 0, 'simple' => 0, 'variable' => 0, 'variations' => 0 ),
 			'health' => array( 'healthy' => 0, 'attention' => 0, 'critical' => 0, 'unknown' => 0 ),
+			'health_by_type' => array(
+				'product' => array( 'healthy' => 0, 'attention' => 0, 'critical' => 0, 'unknown' => 0 ),
+				'variation' => array( 'healthy' => 0, 'attention' => 0, 'critical' => 0, 'unknown' => 0 ),
+			),
 			'actions' => array( 'guid_mismatch' => 0, 'stale' => 0, 'inventory_mismatch' => 0, 'unit_unresolved' => 0, 'manual_price' => 0, 'role_without_price' => 0, 'price_review' => 0, 'sync_failed' => 0 ),
 			'pricing' => array( 'accounting_levels' => 0, 'role_connected' => 0, 'role_without_price' => 0, 'manual' => 0, 'needs_review' => 0 ),
 			'inventory' => array( 'known' => 0, 'mismatch' => 0, 'unknown' => 0, 'multi_unit' => 0, 'unresolved' => 0 ),
@@ -172,17 +176,16 @@ final class Product_Health_Snapshot {
 			return $empty;
 		}
 		$table = self::table();
+		// The dashboard is a read model consumer: even catalog mix counts come
+		// from the snapshot table, not from a second posts/term query that could
+		// disagree with the Product/Variation identity rows.
 		$catalog = $wpdb->get_row( "SELECT
-			COUNT(DISTINCT CASE WHEN p.post_type = 'product' THEN p.ID END) AS products,
-			COUNT(DISTINCT CASE WHEN p.post_type = 'product' AND COALESCE(t.slug, 'simple') = 'simple' THEN p.ID END) AS simple_count,
-			COUNT(DISTINCT CASE WHEN p.post_type = 'product' AND t.slug = 'variable' THEN p.ID END) AS variable_count,
-			COUNT(DISTINCT CASE WHEN p.post_type = 'product_variation' THEN p.ID END) AS variations
-			FROM {$wpdb->posts} p
-			LEFT JOIN {$wpdb->term_relationships} tr ON tr.object_id = p.ID
-			LEFT JOIN {$wpdb->term_taxonomy} tt ON tt.term_taxonomy_id = tr.term_taxonomy_id AND tt.taxonomy = 'product_type'
-			LEFT JOIN {$wpdb->terms} t ON t.term_id = tt.term_id
-			WHERE (p.post_type = 'product' AND p.post_status = 'publish') OR (p.post_type = 'product_variation' AND p.post_status = 'publish')" ); // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.PreparedSQL.NotPrepared -- core aggregate query with fixed identifiers.
-		$health = $wpdb->get_results( "SELECT health_status, COUNT(*) AS total FROM {$table} WHERE post_status = 'publish' GROUP BY health_status" ); // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.PreparedSQL.NotPrepared
+			SUM(item_type = 'product') AS products,
+			SUM(item_type = 'product' AND woo_type = 'simple') AS simple_count,
+			SUM(item_type = 'product' AND woo_type = 'variable') AS variable_count,
+			SUM(item_type = 'variation') AS variations
+			FROM {$table} WHERE post_status = 'publish'" ); // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.PreparedSQL.NotPrepared -- bounded read-model aggregate.
+		$health = $wpdb->get_results( "SELECT item_type, health_status, COUNT(*) AS total FROM {$table} WHERE post_status = 'publish' GROUP BY item_type, health_status" ); // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.PreparedSQL.NotPrepared -- bounded read-model aggregate.
 		$aggregate = $wpdb->get_row( "SELECT
 			COUNT(*) AS snapshot_count,
 			SUM(identity_state = 'guid_mismatch') AS guid_mismatch,
@@ -211,8 +214,14 @@ final class Product_Health_Snapshot {
 			'variations' => (int) ( $catalog->variations ?? 0 ),
 		);
 		foreach ( (array) $health as $row ) {
-			$key = sanitize_key( (string) $row->health_status );
-			if ( array_key_exists( $key, $out['health'] ) ) $out['health'][ $key ] = (int) $row->total;
+			$key  = sanitize_key( (string) $row->health_status );
+			$type = sanitize_key( (string) $row->item_type );
+			if ( array_key_exists( $key, $out['health'] ) ) {
+				$out['health'][ $key ] += (int) $row->total;
+			}
+			if ( isset( $out['health_by_type'][ $type ] ) && array_key_exists( $key, $out['health_by_type'][ $type ] ) ) {
+				$out['health_by_type'][ $type ][ $key ] = (int) $row->total;
+			}
 		}
 		if ( $aggregate ) {
 			$out['actions']['guid_mismatch'] = (int) $aggregate->guid_mismatch;
@@ -326,6 +335,7 @@ final class Product_Health_Snapshot {
 		if ( 'known' === $scope['status'] ) { $warehouse_stock = $scope['total']; $warehouse_count = (int) $scope['count']; }
 
 		$unit_mode = Unit_Engine::MODE_NONE; $is_base = 0; $units_per_pack = null;
+		$available_children = null;
 		$unit_result = null;
 		if ( self::TYPE_VARIATION === $type && $parent_id && function_exists( 'wc_get_product' ) ) {
 			$parent = wc_get_product( $parent_id );
@@ -338,6 +348,9 @@ final class Product_Health_Snapshot {
 		} elseif ( self::TYPE_PRODUCT === $type && 'variable' === $product->get_type() ) {
 			$unit_result = Unit_Engine::resolve_product( $product, $parser );
 			$unit_mode = $unit_result['mode'];
+			// A variable parent has no independent stock source. Its availability
+			// is the aggregate of published, purchasable, in-stock variations.
+			$available_children = self::available_variation_count( $product );
 		}
 
 		$woo_stock = $product->get_stock_quantity();
@@ -350,10 +363,11 @@ final class Product_Health_Snapshot {
 			$inventory_state = null !== $woo_stock ? 'known' : 'unknown';
 		} elseif ( self::TYPE_PRODUCT === $type && 'variable' === $product->get_type() && Unit_Engine::MODE_MULTI_UNIT === $unit_mode && null !== $warehouse_stock ) {
 			// The variable parent is an availability aggregate, never a second
-			// stock source. Its child rows carry the calculation.
-			$inventory_state = 'known';
+			// stock source. Its child rows carry the unit calculation; the parent
+			// state is still derived from purchasable child availability.
+			$inventory_state = null !== $available_children ? 'known' : 'unknown';
 		} elseif ( self::TYPE_PRODUCT === $type && 'variable' === $product->get_type() && Unit_Engine::MODE_NONE === $unit_mode ) {
-			$inventory_state = count( (array) $product->get_children() ) > 0 ? 'known' : 'unknown';
+			$inventory_state = null !== $available_children ? 'known' : 'unknown';
 		} elseif ( 'variable' !== $product->get_type() && null !== $warehouse_stock && null !== $woo_stock ) {
 			$inventory_state = (float) $woo_stock === (float) $warehouse_stock ? 'known' : 'mismatch';
 		} elseif ( Unit_Engine::MODE_UNRESOLVED === $unit_mode ) {
@@ -444,6 +458,32 @@ final class Product_Health_Snapshot {
 			'source_hash'        => $parser->hash(),
 			'updated_at'         => current_time( 'mysql', true ),
 		);
+	}
+
+	/**
+	 * Return null when a parent has no child rows; otherwise return the count
+	 * of children that can actually be purchased. This keeps the parent a
+	 * derived availability row instead of treating every child as available.
+	 *
+	 * @param object $product
+	 * @return int|null
+	 */
+	private static function available_variation_count( $product ) {
+		$children = is_callable( array( $product, 'get_children' ) ) ? (array) $product->get_children() : array();
+		if ( empty( $children ) || ! function_exists( 'wc_get_product' ) ) {
+			return empty( $children ) ? null : 0;
+		}
+		$count = 0;
+		foreach ( $children as $child_id ) {
+			$variation = wc_get_product( absint( $child_id ) );
+			if ( ! $variation || ( is_callable( array( $variation, 'get_status' ) ) && 'publish' !== $variation->get_status() ) ) {
+				continue;
+			}
+			if ( is_callable( array( $variation, 'is_purchasable' ) ) && $variation->is_purchasable() && is_callable( array( $variation, 'is_in_stock' ) ) && $variation->is_in_stock() ) {
+				$count++;
+			}
+		}
+		return $count;
 	}
 
 	private static function overall_status( $identity, $inventory, $pricing, $unit_mode, $sync, $discount, $source_valid ) {

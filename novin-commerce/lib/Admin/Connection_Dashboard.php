@@ -27,6 +27,7 @@ final class Connection_Dashboard {
 		$actions = self::actions( $summary );
 		$catalog = $summary['catalog'];
 		$health  = $summary['health'];
+		$variation_health = isset( $summary['health_by_type']['variation'] ) && is_array( $summary['health_by_type']['variation'] ) ? $summary['health_by_type']['variation'] : array( 'healthy' => 0, 'unknown' => 0 );
 		$warning_count = self::warning_count( $summary );
 
 		echo '<div class="wrap novin-dashboard" dir="rtl">';
@@ -51,8 +52,8 @@ final class Connection_Dashboard {
 		echo '</section>';
 		echo '<section class="novin-panel"><div class="novin-panel-title"><div><span class="novin-kicker">VARIATIONS</span><h2>وضعیت Variation</h2><p>تعداد Variationها مستقل از درصد و Product Parent نمایش داده می‌شود.</p></div></div>';
 		self::bar( 'Variation منتشرشده', (int) $catalog['variations'], max( 1, (int) $catalog['variations'] ), 'purple' );
-		self::bar( 'Variation Healthy', self::bounded_int( $health['healthy'] ), max( 1, (int) $catalog['variations'] ), 'green' );
-		self::bar( 'Variation Unknown', self::bounded_int( $health['unknown'] ), max( 1, (int) $catalog['variations'] ), 'amber' );
+		self::bar( 'Variation Healthy', self::bounded_int( $variation_health['healthy'] ?? 0 ), max( 1, (int) $catalog['variations'] ), 'green' );
+		self::bar( 'Variation Unknown', self::bounded_int( $variation_health['unknown'] ?? 0 ), max( 1, (int) $catalog['variations'] ), 'amber' );
 		echo '</section>';
 		echo '</div>';
 

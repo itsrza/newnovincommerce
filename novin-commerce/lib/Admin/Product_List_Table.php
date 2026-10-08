@@ -4,6 +4,8 @@ namespace Novinwp\Novin_Commerce\Admin;
 
 use MobinDev\Novin_Commerce\Common\Accounting\WebPrd\WebPrd_Parser;
 
+use MobinDev\Novin_Commerce\Common\Accounting\WebPrd\WebPrd_Parser;
+
 /**
  * Optimized WooCommerce product/variation list for Novin Commerce.
  *

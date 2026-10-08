@@ -1,7 +1,6 @@
 === Plugin Name ===
 NovinCommerce - 1.20.0
 Contributors: (this should be a list of wordpress.org userid's)
-Donate link: https://npwp.ir/
 Tags: comments, spam
 Requires at least: 3.0.1
 Tested up to: 3.4
