@@ -48,6 +48,15 @@ class NovinCommerce_Product_Data_Model_Test extends WP_UnitTestCase {
 		$this->assertSame( 'invalid', $missing['state'] );
 	}
 
+	public function test_embedded_role_price_list_supports_json_and_serialized_legacy_values() {
+		$payload = $this->fixture( 'EightPriceLevels' );
+		$entry = array( 'WordPressRoleName' => 'Editor', 'Price' => 101, 'salePrice' => 90 );
+		$payload['PriceRoleList'] = wp_json_encode( array( $entry ) );
+		$this->assertSame( 'Editor', WebPrd_Parser::from( $payload )->role_prices()[0]['name'] );
+		$payload['PriceRoleList'] = serialize( array( $entry ) );
+		$this->assertSame( 90.0, WebPrd_Parser::from( $payload )->role_prices()[0]['sale_price'] );
+	}
+
 	public function test_eight_accounting_levels_are_not_mapped_by_array_position() {
 		$parser = WebPrd_Parser::from( $this->fixture( 'EightPriceLevels' ) );
 		$levels = array_filter( $parser->price_levels(), static function ( $row ) { return $row['valid']; } );

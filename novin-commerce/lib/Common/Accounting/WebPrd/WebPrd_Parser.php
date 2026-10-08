@@ -145,7 +145,42 @@ final class WebPrd_Parser {
 	 */
 	public function price_role_list() {
 		$value = $this->field( 'PriceRoleList', array() );
-		return is_array( $value ) ? array_values( $value ) : array();
+		if ( is_string( $value ) ) {
+			$value = $this->decode_embedded_array( $value );
+		}
+		if ( ! is_array( $value ) ) {
+			return array();
+		}
+
+		// Some legacy payloads contain one named entry rather than a list. It
+		// is safe to wrap that entry; a role=>price map is deliberately not
+		// interpreted because it has no explicit accounting entry contract.
+		$named_keys = array( 'WordPressRoleName', 'RoleName', 'Role', 'role', 'Price', 'price', 'RegularPrice', 'SalePrice', 'salePrice' );
+		if ( array_intersect( $named_keys, array_keys( $value ) ) ) {
+			return array( $value );
+		}
+		return array_values( $value );
+	}
+
+	/**
+	 * PriceRoleList has existed as an array, JSON string and PHP-serialized
+	 * string. Decode only this nested boundary, with classes disabled for
+	 * serialized input; no caller is allowed to invent a positional mapping.
+	 *
+	 * @param string $value
+	 * @return array
+	 */
+	private function decode_embedded_array( $value ) {
+		$value = trim( Text_Encoding::normalize( $value ) );
+		if ( '' === $value ) {
+			return array();
+		}
+		$decoded = json_decode( $value, true, 32 );
+		if ( JSON_ERROR_NONE === json_last_error() && is_array( $decoded ) ) {
+			return $decoded;
+		}
+		$decoded = @unserialize( $value, array( 'allowed_classes' => false ) ); // phpcs:ignore WordPress.PHP.NoSilencedErrors.Discouraged -- malformed legacy payloads must fail closed.
+		return is_array( $decoded ) ? $decoded : array();
 	}
 
 	/**
